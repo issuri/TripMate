@@ -5,6 +5,7 @@ import { db } from '../db/local'
 import type { Expense, ItemKind, Money, Trip } from '../db/types'
 import { CATEGORY_HINT } from '../lib/budget'
 import { buildMoney, defaultRateText, initialSplitMode } from '../lib/expenseForm'
+import { CURRENCIES, currencyLabel, otherCurrencies } from '../lib/locales'
 import { convertToHome, formatMinor, minorDigits, parseMajor, parseRateMicro } from '../lib/money'
 import { nameOf, peopleFor } from '../lib/people'
 import { rescaleSplits, splitEqual, validateSplits } from '../lib/split'
@@ -12,7 +13,6 @@ import { btnGhost, btnPrimary, Field, input, Sheet } from './kit'
 
 export interface ExpensePreset { categoryHint?: ItemKind; categoryId?: string; itineraryItemId?: string | null; shoppingItemId?: string | null; localMinor?: number; currency?: string; memo?: string }
 
-const CURRENCIES = ['KRW', 'JPY', 'USD', 'EUR', 'GBP', 'CNY', 'THB', 'TWD', 'VND', 'SGD']
 const toLocalInput = (ms: number) => { const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16) }
 const plain = (minor: number, cur: string) => formatMinor(minor, cur).replace(/,/g, '')
 
@@ -124,7 +124,7 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-2"><Field label="금액 *"><input autoFocus inputMode="decimal" className={`${input} text-xl font-bold`} value={local} onChange={(e) => { dirty.current.money = true; setLocal(e.target.value) }} placeholder="0" /></Field></div>
-          <Field label="통화"><select className={input} value={cur} onChange={(e) => { dirty.current.money = true; setCur(e.target.value); setLast('rate'); setRate(defaultRateText(e.target.value, defaults?.rates[e.target.value])) }}>{[...new Set([trip.localCurrency, ...CURRENCIES])].map((c) => <option key={c}>{c}</option>)}</select></Field>
+          <Field label="통화"><select className={input} value={cur} onChange={(e) => { dirty.current.money = true; setCur(e.target.value); setLast('rate'); setRate(defaultRateText(e.target.value, defaults?.rates[e.target.value])) }}>{[...new Set([...(m0 ? [m0.currency] : []), trip.localCurrency, ...CURRENCIES, ...otherCurrencies()])].map((c) => <option key={c} value={c}>{c}{currencyLabel(c) ? ` · ${currencyLabel(c)}` : ''}</option>)}</select></Field>
         </div>
 
         {!isHomeCur && (

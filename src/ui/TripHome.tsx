@@ -4,6 +4,7 @@ import { db } from '../db/local'
 import type { Trip } from '../db/types'
 import { addDays, computeStatus, daysBetween, todayIn } from '../lib/dates'
 import { computeGuide, nextItem } from '../lib/guide'
+import { isDomestic } from '../lib/tripType'
 import { Card, KIND_EMOJI, KIND_LABEL } from './kit'
 import ExpenseSummary from './ExpenseSummary'
 import NotificationCard from './NotificationCard'
@@ -19,7 +20,7 @@ export default function TripHome() {
   const today = todayIn(trip.timeZone)
   const todayNo = status === 'ongoing' ? daysBetween(trip.startDate, today) : null
   const next = nextItem(items)
-  const stages = computeGuide(items, checklist, total)
+  const stages = computeGuide(items, checklist, total, { domestic: isDomestic(trip) })
   const done = items.filter((i) => i.completed).length
   const dday = status === 'planned' ? daysBetween(today, trip.startDate) - 1 : null
   const currentIdx = stages.findIndex((s) => s.state === 'current')

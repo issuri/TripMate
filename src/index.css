@@ -4,13 +4,13 @@
 /* 디자인 토큰 — 다음 일정(coral)만 강한 색을 쓰고 나머지는 조용하게 유지한다. */
 @theme {
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif;
-  --color-paper: #f3f4f8;
+  --color-paper: #f8f4f7;
   --color-ink: #0f1424;
   --color-ink-2: #5b6275;
   --color-ink-3: #9ba1b2;
   --color-line: #e4e6ee;
-  --color-signal: #3358ff;
-  --color-signal-soft: #e8edff;
+  --color-signal: #d6336c;
+  --color-signal-soft: #ffe6f0;
   --color-coral: #ff6a3d;
   --color-mint: #12a679;
   --color-danger: #e5484d;

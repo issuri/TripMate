@@ -2,10 +2,21 @@
 // 환율은 micro 정수(1 현지단위 = rateMicro/1e6 원)로 저장한다.
 
 const MINOR_DIGITS: Record<string, number> = {
-  KRW: 0, JPY: 0, VND: 0, IDR: 0, TWD: 2, USD: 2, EUR: 2, GBP: 2, CNY: 2, THB: 2, SGD: 2, HKD: 2, AUD: 2, CAD: 2,
+  KRW: 0, JPY: 0, VND: 0, IDR: 0, CLP: 0, ISK: 0, LAK: 0, MMK: 0, HUF: 0, COP: 0, TWD: 2, USD: 2, EUR: 2, GBP: 2, CNY: 2, THB: 2, SGD: 2, HKD: 2, AUD: 2, CAD: 2,
 }
 
-export const minorDigits = (currency: string): number => MINOR_DIGITS[currency] ?? 2
+const intlDigits = new Map<string, number>()
+/** 위 표에 없는 통화는 브라우저가 아는 실제 소수 자릿수를 쓴다(쿠웨이트 디나르처럼 3자리인 통화가 있다). 알 수 없으면 2. */
+export const minorDigits = (currency: string): number => {
+  const known = MINOR_DIGITS[currency]
+  if (known !== undefined) return known
+  let d = intlDigits.get(currency)
+  if (d === undefined) {
+    try { d = new Intl.NumberFormat('en-US', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2 } catch { d = 2 }
+    intlDigits.set(currency, d)
+  }
+  return d
+}
 
 /** "12.34" → 1234 (USD). 소수 자릿수 초과/잘못된 입력은 null. 문자열 기반이라 부동소수점 오차 없음. */
 export function parseMajor(input: string, currency: string): number | null {

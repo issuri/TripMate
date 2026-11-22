@@ -8,6 +8,7 @@ import { db } from '../db/local'
 import { addPlace, deletePlace, validCoord } from '../db/places'
 import type { Place, Trip } from '../db/types'
 import { daysBetween } from '../lib/dates'
+import { isDomestic } from '../lib/tripType'
 import { directionsUrl, OSM_ATTRIBUTION, OSM_TILE_URL, placeUrl, searchPlaces, type Found, type Pt } from '../lib/maps'
 import { btnGhost, btnPrimary, Card, Field, input, KIND_EMOJI } from './kit'
 
@@ -130,7 +131,7 @@ function MapView({ stops, online }: { stops: Place[]; online: boolean }) {
     const g = layer.current!
     g.clearLayers()
     const pts = stops.filter((s) => s.lat != null && s.lng != null).map((s) => ({ s, ll: L.latLng(s.lat!, s.lng!) }))
-    if (pts.length >= 2) L.polyline(pts.map((p) => p.ll), { color: '#3358ff', weight: 4, opacity: 0.85 }).addTo(g)
+    if (pts.length >= 2) L.polyline(pts.map((p) => p.ll), { color: '#d6336c', weight: 4, opacity: 0.85 }).addTo(g)
     pts.forEach(({ s, ll }, i) => {
       const icon = L.divIcon({ className: '', html: `<div style="width:28px;height:28px;border-radius:9999px;background:#ff6a3d;color:#fff;font:700 13px/28px system-ui;text-align:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">${i + 1}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] })
       L.marker(ll, { icon, title: s.name, alt: s.name }).addTo(g)
@@ -165,7 +166,7 @@ function PlaceSearch({ trip, day, online }: { trip: Trip; day: number; online: b
     try {
       const { results, cached } = await searchPlaces(`${q} ${trip.city}`.trim())
       setRes(results)
-      setMsg(results.length ? (cached ? '이전 검색 결과예요.' : null) : '검색 결과가 없어요. 현지어나 영어로 검색해 보세요.')
+      setMsg(results.length ? (cached ? '이전 검색 결과예요.' : null) : (isDomestic(trip) ? '검색 결과가 없어요. 장소 이름이나 주소로 검색해 보세요.' : '검색 결과가 없어요. 현지어나 영어로 검색해 보세요.'))
     } catch (e) { setMsg((e as Error).message) } finally { setBusy(false) }
   }
   const save = async (f: Pick<Found, 'name' | 'address' | 'lat' | 'lng'> & { id: string | null }, toDay: boolean) => {

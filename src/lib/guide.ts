@@ -18,10 +18,15 @@ const STAGES: Def[] = [
   { key: 'return', label: '귀국', match: (i, l) => isKind('flight')(i) && l > 1 && i.dayNumber === l },
 ]
 
-export function computeGuide(items: ItineraryItem[], checklist: ChecklistItem[], totalDays: number): GuideStage[] {
+// 국내 여행: 공항·항공 단계는 해당 일정(예: 제주행 항공편)이 있을 때만 보이고, "귀국"은 "귀가"로 부른다.
+const AIRPORT_KEYS = new Set(['airport_out', 'flight_out', 'airport_ret'])
+const DOMESTIC_LABEL: Record<string, string> = { airport_ret: '공항 이동(귀가)', return: '귀가' }
+
+export function computeGuide(items: ItineraryItem[], checklist: ChecklistItem[], totalDays: number, opts: { domestic?: boolean } = {}): GuideStage[] {
   const live = items.filter((i) => i.deletedAt === null)
   const list = checklist.filter((c) => c.deletedAt === null)
-  const raw = STAGES.map((d) => {
+  const defs = opts.domestic ? STAGES.map((d) => ({ ...d, label: DOMESTIC_LABEL[d.key] ?? d.label })) : STAGES
+  const raw = defs.map((d) => {
     if (d.key === 'prep') {
       const pending = list.filter((c) => !c.done).length
       return { key: d.key, label: d.label, total: list.length, pending }
@@ -30,7 +35,7 @@ export function computeGuide(items: ItineraryItem[], checklist: ChecklistItem[],
     return { key: d.key, label: d.label, total: m.length, pending: m.filter((i) => !i.completed).length }
   })
   let currentSet = false
-  return raw.map((s) => {
+  return raw.filter((s) => !(opts.domestic && AIRPORT_KEYS.has(s.key) && s.total === 0)).map((s) => {
     if (s.total === 0) return { ...s, state: 'empty' as const }
     if (s.pending === 0) return { ...s, state: 'done' as const }
     if (!currentSet) { currentSet = true; return { ...s, state: 'current' as const } }

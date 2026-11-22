@@ -7,19 +7,31 @@ import { createTrip, deleteTrip, validateTrip } from '../db/trips'
 import { changedFields } from '../lib/diff'
 import { useAuth } from '../sync/auth'
 import { myRole } from '../sync/sharing'
+import { currencyLabel, CURRENCIES, otherCurrencies } from '../lib/locales'
+import { placeOf, type Place } from '../lib/places'
+import { FOREIGN_DEFAULT, HOME_CURRENCY, HOME_TZ, isDomestic } from '../lib/tripType'
 import { btnGhost, btnPrimary, Card, Field, input } from './kit'
+import PlacePicker from './PlacePicker'
 
-const TZ = [['Asia/Seoul', '한국'], ['Asia/Tokyo', '일본'], ['Asia/Bangkok', '태국/베트남'], ['Asia/Taipei', '대만'], ['Asia/Singapore', '싱가포르'],
-  ['Europe/Paris', '유럽(서)'], ['Europe/London', '영국'], ['America/New_York', '미국 동부'], ['America/Los_Angeles', '미국 서부'], ['Australia/Sydney', '호주']]
-const CUR = ['KRW', 'JPY', 'USD', 'EUR', 'GBP', 'CNY', 'THB', 'TWD', 'VND', 'SGD']
+const otherCurs = otherCurrencies()
+const DEFAULT_COUNTRY = placeOf(FOREIGN_DEFAULT.timeZone)?.country ?? ''
 
+// "새 여행"과 "여행 수정"(그리고 다른 여행의 수정 화면)이 같은 컴포넌트를 쓰므로, 여행마다 key를 달아 이전 입력값이 남지 않게 한다.
 export default function TripForm() {
+  const { id } = useParams()
+  return <TripFormInner key={id ?? 'new'} />
+}
+
+function TripFormInner() {
   const { id } = useParams()
   const nav = useNavigate()
   const existing = useLiveQuery(() => (id ? db.trips.get(id) : undefined), [id])
   const auth = useAuth()
   const role = useLiveQuery(() => (id ? myRole(id, undefined, auth.userId) : 'admin'), [id, auth.userId])
-  const [f, setF] = useState({ name: '', country: '', city: '', startDate: '', endDate: '', timeZone: 'Asia/Seoul', purpose: '', companions: '', localCurrency: 'KRW', coverImage: '' })
+  const [f, setF] = useState({ name: '', country: DEFAULT_COUNTRY, city: '', startDate: '', endDate: '', timeZone: FOREIGN_DEFAULT.timeZone, purpose: '', companions: '', localCurrency: FOREIGN_DEFAULT.localCurrency, coverImage: '' })
+  const [abroad, setAbroad] = useState(true)   // 해외 여행(기본) / 국내 여행. 국내 여행은 한국 시간대와 원화로 정해진다
+  const [editCountry, setEditCountry] = useState(false)
+  const lastForeign = useRef<{ timeZone: string; localCurrency: string; country: string }>({ ...FOREIGN_DEFAULT, country: DEFAULT_COUNTRY })
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false) // 버튼 비활성화 표시용
   const submitting = useRef(false)        // 연타 방지는 ref로(상태는 같은 틱의 연속 클릭을 막지 못함)
@@ -32,9 +44,36 @@ export default function TripForm() {
       snapshot.current = existing as unknown as Record<string, unknown> // 폼을 연 시점의 값(변경 비교 기준)
       const { name, country, city, startDate, endDate, timeZone, purpose, localCurrency } = existing
       setF({ name, country, city, startDate, endDate, timeZone, purpose, localCurrency, companions: existing.companions.join(', '), coverImage: existing.coverImage ?? '' })
+      setAbroad(!isDomestic(existing))
+      if (!isDomestic(existing)) lastForeign.current = { timeZone, localCurrency, country }
     }
   }, [existing])
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const chooseTripType = (toAbroad: boolean) => {
+    if (toAbroad === abroad) return
+    setAbroad(toAbroad)
+    setErr(null)
+    setF((p) => {
+      if (toAbroad) return { ...p, ...lastForeign.current }
+      // 다시 해외로 바꾸면 고른 값을 되돌린다. 숨겨진 국가 칸의 외국 이름이 국내 여행에 저장되지 않도록 비워 둔다.
+      if (!isDomestic(p)) lastForeign.current = { timeZone: p.timeZone, localCurrency: p.localCurrency, country: p.country }
+      return { ...p, timeZone: HOME_TZ, localCurrency: HOME_CURRENCY, country: '' }
+    })
+  }
+  // 여행지를 고르면 국가 이름·현지 시간대·추천 통화가 함께 채워진다(통화와 국가는 이어서 바꿀 수 있다)
+  const pickPlace = (p: Place) => {
+    setErr(null)
+    setF((prev) => ({ ...prev, timeZone: p.id, country: p.country, localCurrency: p.currency }))
+    lastForeign.current = { timeZone: p.id, localCurrency: p.currency, country: p.country }
+  }
+  // 직전 값 기준으로 갱신한다(자동완성처럼 여러 칸이 연달아 바뀔 때 앞서 입력한 칸이 사라지지 않도록)
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => { const v = e.target.value; setF((p) => ({ ...p, [k]: v })) }
+  // 종료일이 시작일보다 앞서는 값은 입력할 수 없다: 시작일을 종료일 뒤로 옮기면 종료일을 함께 옮기고, 앞선 종료일은 시작일로 되돌린다.
+  const [dateNote, setDateNote] = useState<string | null>(null)
+  const setStart = (v: string) => { setDateNote(null); setF((p) => (v && p.endDate && p.endDate < v ? { ...p, startDate: v, endDate: v } : { ...p, startDate: v })) }
+  const setEnd = (v: string) => {
+    if (v && f.startDate && v < f.startDate) { setDateNote('종료일은 시작일보다 빠를 수 없어요.'); setF((p) => ({ ...p, endDate: p.startDate })); return }
+    setDateNote(null); setF((p) => ({ ...p, endDate: v }))
+  }
 
   const onImage = (file?: File) => {
     if (!file) return
@@ -61,8 +100,9 @@ export default function TripForm() {
 
   const submit = async () => {
     if (submitting.current) return // 연속 탭으로 여행이 중복 생성되는 것을 방지
+    if (abroad && isDomestic(f)) return setErr('해외 여행이면 현지 시간대나 통화를 골라 주세요. 한국 시간대와 원화는 국내 여행이에요.')
     const data = {
-      name: f.name, country: f.country, city: f.city, startDate: f.startDate, endDate: f.endDate, timeZone: f.timeZone,
+      name: f.name, country: !abroad && !f.country.trim() ? '대한민국' : f.country, city: f.city, startDate: f.startDate, endDate: f.endDate, timeZone: f.timeZone,
       purpose: f.purpose, localCurrency: f.localCurrency,
       companions: f.companions.split(',').map((s) => s.trim()).filter(Boolean), coverImage: f.coverImage || null,
     }
@@ -90,19 +130,38 @@ export default function TripForm() {
     <main className="mx-auto max-w-lg space-y-4 px-4 pb-10 pt-[calc(1.5rem+env(safe-area-inset-top))]">
       <h1 className="px-1 text-[28px] font-extrabold tracking-tight">{id ? '여행 수정' : '새 여행'}</h1>
       <Card className="space-y-3">
-        <Field label="여행 이름 *"><input className={input} value={f.name} onChange={set('name')} placeholder="예: 도쿄 3박 4일" /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="국가"><input className={input} value={f.country} onChange={set('country')} /></Field>
-          <Field label="도시"><input className={input} value={f.city} onChange={set('city')} /></Field>
+        <div role="group" aria-label="여행 종류" className="grid grid-cols-2 gap-1 rounded-2xl bg-paper p-1">
+          {([[true, '해외 여행'], [false, '국내 여행']] as const).map(([v, l]) => (
+            <button key={l} type="button" aria-pressed={abroad === v} onClick={() => chooseTripType(v)}
+              className={`rounded-xl py-2.5 text-sm font-semibold ${abroad === v ? 'bg-white text-ink shadow-sm ring-1 ring-line' : 'text-ink-2'}`}>{l}</button>
+          ))}
         </div>
+        <Field label="여행 이름 *"><input className={input} value={f.name} onChange={set('name')} placeholder={abroad ? '예: 도쿄 3박 4일' : '예: 제주 2박 3일'} /></Field>
+        {abroad ? (
+          <>
+            <Field label="여행지 *"><PlacePicker value={f.timeZone} exclude={[HOME_TZ]} onPick={pickPlace} /></Field>
+            <p className="-mt-1 px-1 text-xs text-ink-3">
+              국가: {f.country || '정해지지 않음'} · 알림은 현지 시간 기준이에요. <button type="button" className="font-semibold text-signal" onClick={() => setEditCountry((v) => !v)}>{editCountry ? '닫기' : '국가 이름 고치기'}</button>
+            </p>
+            {editCountry && <Field label="국가 (여러 나라를 가면 직접 적어도 돼요)"><input className={input} value={f.country} onChange={set('country')} placeholder="예: 프랑스, 이탈리아" /></Field>}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="도시"><input className={input} value={f.city} onChange={set('city')} /></Field>
+              <Field label="현지 통화"><select className={input} value={f.localCurrency} onChange={set('localCurrency')}>
+                {!CURRENCIES.includes(f.localCurrency) && !otherCurs.includes(f.localCurrency) && <option value={f.localCurrency}>{f.localCurrency}</option>}
+                <optgroup label="자주 쓰는 통화">{CURRENCIES.map((c) => <option key={c} value={c}>{c} · {currencyLabel(c)}</option>)}</optgroup>
+                {otherCurs.length > 0 && <optgroup label="그 밖의 모든 통화">{otherCurs.map((c) => <option key={c} value={c}>{c}{currencyLabel(c) ? ` · ${currencyLabel(c)}` : ''}</option>)}</optgroup>}
+              </select></Field>
+            </div>
+          </>
+        ) : (
+          <Field label="지역"><input className={input} value={f.city} onChange={set('city')} placeholder="제주, 부산, 강릉 등" /></Field>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="시작일 *"><input type="date" className={input} value={f.startDate} onChange={set('startDate')} /></Field>
-          <Field label="종료일 *"><input type="date" className={input} value={f.endDate} onChange={set('endDate')} /></Field>
+          <Field label="시작일 *"><input type="date" className={input} value={f.startDate} onChange={(e) => setStart(e.target.value)} /></Field>
+          <Field label="종료일 *"><input type="date" className={input} value={f.endDate} min={f.startDate || undefined} onChange={(e) => setEnd(e.target.value)} /></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="현지 시간대(알림 기준)"><select className={input} value={f.timeZone} onChange={set('timeZone')}>{TZ.map(([v, l]) => <option key={v} value={v}>{l} ({v})</option>)}</select></Field>
-          <Field label="현지 통화"><select className={input} value={f.localCurrency} onChange={set('localCurrency')}>{CUR.map((c) => <option key={c}>{c}</option>)}</select></Field>
-        </div>
+        {dateNote && <p className="px-1 text-xs text-danger" role="alert">{dateNote}</p>}
+        {!abroad && <p className="px-1 text-xs text-ink-3">국내 여행은 한국 시간과 원화로 설정돼요. 알림은 한국 시간 기준이에요.</p>}
         <Field label="여행 목적"><input className={input} value={f.purpose} onChange={set('purpose')} placeholder="관광, 휴양, 출장 등" /></Field>
         <Field label="동반자 (쉼표로 구분)"><input className={input} value={f.companions} onChange={set('companions')} placeholder="민수, 지은" /></Field>
         <Field label="대표 이미지">

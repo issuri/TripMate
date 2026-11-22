@@ -1,12 +1,13 @@
 import { v4 as uuid } from 'uuid'
 import { computeStatus, daysBetween, isValidDate } from '../lib/dates'
 import { isValidTimeZone } from '../lib/tz'
+import { CHECKLIST_ABROAD, checklistFor } from '../lib/tripType'
 import { db as defaultDb, type TripMateDB } from './local'
 import { cancelTripReminders, reconcileTripSafe } from './reminders'
 import type { Trip } from './types'
 
 export const DEFAULT_CATEGORIES = ['항공 및 교통', '숙박', '식비', '관광 및 입장료', '쇼핑', '기타']
-export const DEFAULT_CHECKLIST = ['여권 확인', '항공권/예약 확인', '환전', '로밍/유심', '충전기/어댑터', '여행자 보험']
+export const DEFAULT_CHECKLIST = CHECKLIST_ABROAD   // 국내 여행은 checklistFor(trip)가 국내용 목록을 돌려준다
 
 export interface NewTripInput {
   name: string
@@ -54,7 +55,7 @@ export async function createTrip(input: NewTripInput, db: TripMateDB = defaultDb
   await db.transaction('rw', [db.trips, db.expenseCategories, db.checklistItems, db.outbox], async () => {
     await db.trips.add(trip)
     const cats = DEFAULT_CATEGORIES.map((name, i) => ({ id: uuid(), tripId: trip.id, ...meta, name, budgetMinor: 0, sortOrder: i }))
-    const checks = DEFAULT_CHECKLIST.map((title, i) => ({ id: uuid(), tripId: trip.id, ...meta, title, done: false, sortOrder: i }))
+    const checks = checklistFor(trip).map((title, i) => ({ id: uuid(), tripId: trip.id, ...meta, title, done: false, sortOrder: i }))
     await db.expenseCategories.bulkAdd(cats)
     await db.checklistItems.bulkAdd(checks)
     // 기본으로 만든 하위 데이터도 서버에 올라가도록 동기화 큐에 넣는다(빠뜨리면 다른 기기에 기본 항목이 없다)

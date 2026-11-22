@@ -63,7 +63,7 @@ export default function ShoppingPage() {
           <div><dt className="text-xs text-ink-2">실제 결제</dt><dd className="font-bold">{formatMinor(sum.actualMinor, cur)}</dd></div>
           <div><dt className="text-xs text-ink-2">구매 완료</dt><dd className="font-bold">{sum.purchasedCount}/{items.length}</dd></div>
         </dl>
-        <p className="mt-2 text-xs text-ink-3">금액은 현지 통화({cur}) 기준이에요. 예상 가격은 지출로 자동 기록되지 않아요.</p>
+        <p className="mt-2 text-xs text-ink-3">{cur === 'KRW' ? '금액은 원화 기준이에요.' : `금액은 현지 통화(${cur}) 기준이에요.`} 예상 가격은 지출로 자동 기록되지 않아요.</p>
         {sum.unpricedPurchased > 0 && <p className="mt-1 text-xs text-coral">실제 결제 금액을 입력하지 않은 구매 완료 상품이 {sum.unpricedPurchased}개 있어요.</p>}
       </Card>
 
