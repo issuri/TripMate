@@ -37,11 +37,16 @@ select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6275' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 0.9rem center; background-size: 1.25rem; padding-right: 2.75rem;
 }
-input[type='date'], input[type='time'], input[type='datetime-local'] { display: block; text-align: left; }
-input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-date-and-time-value, input[type='datetime-local']::-webkit-date-and-time-value { text-align: left; min-height: 1.5rem; }
-/* 아이폰은 값이 비면 칸이 텅 비어 보이므로 안내 글자를 보여 준다(데스크톱·안드로이드는 기본 안내가 있어 제외) */
+/* 높이를 다른 칸과 같은 52px 로 고정한다(아이폰이 칸을 두 줄 높이로 키우는 일이 없도록) */
+input[type='date'], input[type='time'], input[type='datetime-local'] { display: block; text-align: left; height: 3.25rem; overflow: hidden; }
+input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-date-and-time-value, input[type='datetime-local']::-webkit-date-and-time-value { text-align: left; }
+/*
+ * 아이폰은 값이 비면 칸이 텅 비어 보이므로 안내 글자를 보여 준다(데스크톱·안드로이드는 기본 안내가 있어 제외).
+ * 비어 있는 값 영역은 숨겨서, 안내 글자 한 줄과 값 영역 한 줄이 겹쳐 높이가 두 배가 되지 않게 한다.
+ */
 @supports (-webkit-touch-callout: none) {
-  input[data-empty='true']::before { content: attr(data-ph); color: var(--color-ink-3); }
+  input[data-empty='true']::-webkit-date-and-time-value { display: none; }
+  input[data-empty='true']::before { content: attr(data-ph); display: block; color: var(--color-ink-3); line-height: 1.5rem; }
 }
 
 /* 탑승권 느낌의 티켓: 양옆 반원 노치 */
