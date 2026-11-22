@@ -28,14 +28,14 @@ describe('timezone', () => {
 })
 
 describe('reminder generation', () => {
-  it('creates start + leave reminders in destination time, and a trip-eve reminder', async () => {
+  it('creates start + leave reminders in destination time, and a trip-eve reminder in Korean time', async () => {
     const it = await addItem(tripId, { dayNumber: 1, kind: 'flight', title: '항공편', startTime: '10:00', travelMinutes: 45, reminderMinutesBefore: 60 }, db)
     await reconcileTrip(tripId, db, NOW)
     const r = await all()
     const by = Object.fromEntries(r.map((x) => [x.kind, x]))
     expect(by.start.fireAt).toBe(zonedToUtc('2030-05-10', '09:00', 'Asia/Tokyo'))
     expect(by.leave.fireAt).toBe(zonedToUtc('2030-05-10', '09:15', 'Asia/Tokyo'))
-    expect(by.trip_eve.fireAt).toBe(zonedToUtc('2030-05-09', '20:00', 'Asia/Tokyo'))
+    expect(by.trip_eve.fireAt).toBe(zonedToUtc('2030-05-09', '20:00', 'Asia/Seoul'))     // 출발 전에는 한국에 있으므로 한국 시간 저녁 8시
     expect(by.start.url).toBe(`/trips/${tripId}/day/1?item=${it.id}`)
   })
   it('no reminder for items without time, disabled, completed', async () => {

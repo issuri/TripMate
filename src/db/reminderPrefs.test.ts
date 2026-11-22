@@ -13,6 +13,37 @@ const newTrip = (name = '도쿄') => createTrip({ name, country: '일본', city:
 const timed = (tripId: string, title: string, startTime = '10:00') => addItem(tripId, { dayNumber: 2, kind: 'sight', title, startTime, reminderEnabled: true, reminderMinutesBefore: 30 }, db)
 const count = async (tripId: string) => (await db.reminders.where('tripId').equals(tripId).toArray()).length
 
+describe('the evening-before reminder is always at 20:00 Korean time', () => {
+  const eve = async (timeZone: string, localCurrency: string) => {
+    const t = await createTrip({ name: 'x', country: '', city: '', startDate: '2099-05-10', endDate: '2099-05-12', timeZone, localCurrency }, db)
+    return db.reminders.get(`trip:${t.id}:eve`)
+  }
+  it('does not move with the destination time zone (Tokyo, Paris, New York, Sydney, Seoul)', async () => {
+    const want = Date.UTC(2099, 4, 9, 11, 0)          // 한국 20:00 = UTC 11:00 (한국은 UTC+9, 서머타임 없음)
+    for (const [tz, cur] of [['Asia/Tokyo', 'JPY'], ['Europe/Paris', 'EUR'], ['America/New_York', 'USD'], ['Australia/Sydney', 'AUD'], ['Asia/Seoul', 'KRW'], ['Pacific/Honolulu', 'USD']]) {
+      expect((await eve(tz, cur))?.fireAt, tz).toBe(want)
+    }
+  })
+  it('shows as 20:00 on a Korean clock', async () => {
+    const r = await eve('Europe/Paris', 'EUR')
+    const kst = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(r!.fireAt)
+    expect(kst).toBe('09/05/2099, 20:00')
+  })
+  it('changing the destination later does not move it', async () => {
+    const t = await createTrip({ name: 'x', country: '', city: '', startDate: '2099-05-10', endDate: '2099-05-12', timeZone: 'Asia/Tokyo', localCurrency: 'JPY' }, db)
+    const before = (await db.reminders.get(`trip:${t.id}:eve`))?.fireAt
+    const { updateTrip } = await import('./itinerary')
+    await updateTrip(t.id, { timeZone: 'America/New_York' }, db)
+    expect((await db.reminders.get(`trip:${t.id}:eve`))?.fireAt).toBe(before)
+  })
+  it('moves with the start date', async () => {
+    const t = await createTrip({ name: 'x', country: '', city: '', startDate: '2099-05-10', endDate: '2099-05-12', timeZone: 'Asia/Tokyo', localCurrency: 'JPY' }, db)
+    const { updateTrip } = await import('./itinerary')
+    await updateTrip(t.id, { startDate: '2099-05-20', endDate: '2099-05-22' }, db)
+    expect((await db.reminders.get(`trip:${t.id}:eve`))?.fireAt).toBe(Date.UTC(2099, 4, 19, 11, 0))
+  })
+})
+
 describe('turning reminders off for a trip on this device', () => {
   it('is on by default, and a new trip gets its evening-before reminder plus one per timed item', async () => {
     const t = await newTrip()

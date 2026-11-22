@@ -147,7 +147,7 @@ function TripFormInner() {
           <>
             <Field label="여행지 *"><PlacePicker value={f.timeZone} exclude={[HOME_TZ]} onPick={pickPlace} /></Field>
             <p className="-mt-1 px-1 text-xs text-ink-3">
-              국가: {f.country || '정해지지 않음'} · 알림은 현지 시간 기준이에요. <button type="button" className="font-semibold text-signal" onClick={() => setEditCountry((v) => !v)}>{editCountry ? '닫기' : '국가 이름 고치기'}</button>
+              국가: {f.country || '정해지지 않음'} · 일정 알림은 현지 시간, 출발 전날 알림은 한국 시간 기준이에요. <button type="button" className="font-semibold text-signal" onClick={() => setEditCountry((v) => !v)}>{editCountry ? '닫기' : '국가 이름 고치기'}</button>
             </p>
             {editCountry && <Field label="국가 (여러 나라를 가면 직접 적어도 돼요)"><input className={input} value={f.country} onChange={set('country')} placeholder="예: 프랑스, 이탈리아" /></Field>}
             <div className="grid grid-cols-2 gap-3">
@@ -167,7 +167,7 @@ function TripFormInner() {
           <Field label="종료일 *"><input type="date" className={input} value={f.endDate} min={f.startDate || undefined} onChange={(e) => setEnd(e.target.value)} /></Field>
         </div>
         {dateNote && <p className="px-1 text-xs text-danger" role="alert">{dateNote}</p>}
-        {!abroad && <p className="px-1 text-xs text-ink-3">국내 여행은 한국 시간과 원화로 설정돼요. 알림은 한국 시간 기준이에요.</p>}
+        {!abroad && <p className="px-1 text-xs text-ink-3">국내 여행은 한국 시간과 원화로 설정돼요. 모든 알림은 한국 시간 기준이에요.</p>}
         <Field label="여행 목적"><input className={input} value={f.purpose} onChange={set('purpose')} placeholder="관광, 휴양, 출장 등" /></Field>
         <Field label="동반자 (쉼표로 구분)"><input className={input} value={f.companions} onChange={set('companions')} placeholder="민수, 지은" /></Field>
         {!id && (

@@ -122,7 +122,7 @@ export interface Reminder {
   tripId: string
   itemId: string | null
   kind: ReminderKind
-  fireAt: number          // UTC ms (여행지 현지 시간대 기준으로 계산됨)
+  fireAt: number          // UTC ms (일정 알림은 여행지 현지 시간대, 출발 전날 알림은 한국 시간 기준으로 계산됨)
   title: string
   body: string
   url: string             // 알림 클릭 시 이동할 앱 내 경로

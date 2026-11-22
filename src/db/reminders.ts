@@ -1,6 +1,6 @@
 import { addDays } from '../lib/dates'
 import { zonedToUtc } from '../lib/tz'
-import { eveReminderBody } from '../lib/tripType'
+import { eveReminderBody, HOME_TZ } from '../lib/tripType'
 import { db as defaultDb, type TripMateDB } from './local'
 import type { ItineraryItem, Reminder, Trip } from './types'
 
@@ -41,10 +41,10 @@ export function desiredForItem(trip: Trip, it: ItineraryItem, now: number): Remi
   return out
 }
 
-/** 출발 전날 저녁 알림 */
+/** 출발 전날 저녁 알림. 출발 전에는 한국에 있으므로 여행지 시간대가 아니라 한국 시간 저녁 8시에 보낸다. */
 export function desiredForTrip(trip: Trip, now: number): Reminder[] {
   if (trip.deletedAt !== null) return []
-  const at = zonedToUtc(addDays(trip.startDate, -1), '20:00', trip.timeZone)
+  const at = zonedToUtc(addDays(trip.startDate, -1), '20:00', HOME_TZ)
   if (at <= now + MIN_FUTURE_MS) return []
   return [{ id: `trip:${trip.id}:eve`, tripId: trip.id, itemId: null, kind: 'trip_eve', fireAt: at, title: `${trip.name} 출발 전날이에요`,
     body: eveReminderBody(trip), url: `/trips/${trip.id}/checklist`, state: 'pending', firedAt: null }]

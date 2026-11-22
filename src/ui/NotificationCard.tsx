@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { remindersEnabled, setRemindersEnabled, upcomingReminders } from '../db/reminders'
 import type { Trip } from '../db/types'
 import { isIOS, isStandalone, permissionState, requestPermission, showReminder, type PermissionState } from '../lib/notify'
-import { isDomestic } from '../lib/tripType'
+import { HOME_TZ, isDomestic } from '../lib/tripType'
 import { Card } from './kit'
 
 const fmt = (ms: number, tz: string) =>
@@ -74,11 +74,17 @@ export default function NotificationCard({ trip }: { trip: Trip }) {
         {upcoming.length === 0
           ? <p className="text-sm text-ink-2">예약된 알림이 없어요. 시간이 있는 일정에는 알림이 자동으로 예약돼요.</p>
           : <>
-              <p className="text-sm text-ink-2">예약된 알림 {upcoming.length}개 · {isDomestic(trip) ? '한국' : '현지'} 시간 기준</p>
+              <p className="text-sm text-ink-2">예약된 알림 {upcoming.length}개 · {isDomestic(trip) ? '한국 시간 기준' : '일정은 현지 시간, 출발 전날은 한국 시간 기준'}</p>
               <ul className="mt-2 space-y-1.5">
-                {upcoming.slice(0, 3).map((r) => (
-                  <li key={r.id} className="num flex gap-3 text-sm"><span className="shrink-0 font-bold text-signal">{fmt(r.fireAt, trip.timeZone)}</span><span className="min-w-0 truncate">{r.title}</span></li>
-                ))}
+                {upcoming.slice(0, 3).map((r) => {
+                  const korea = r.kind === 'trip_eve'      // 출발 전날 알림은 한국 시간으로 보여준다
+                  return (
+                    <li key={r.id} className="num flex gap-3 text-sm">
+                      <span className="shrink-0 font-bold text-signal">{fmt(r.fireAt, korea ? HOME_TZ : trip.timeZone)}{korea && !isDomestic(trip) ? ' (한국)' : ''}</span>
+                      <span className="min-w-0 truncate">{r.title}</span>
+                    </li>
+                  )
+                })}
               </ul>
             </>}
       </div>
