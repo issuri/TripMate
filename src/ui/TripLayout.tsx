@@ -4,7 +4,7 @@ import { db } from '../db/local'
 import { useAuth } from '../sync/auth'
 import { discardLocalCopy } from '../sync/engine'
 import { can, myRole } from '../sync/sharing'
-import { Icon } from './kit'
+import { askConfirm, Icon } from './kit'
 
 export default function TripLayout() {
   const { id = '' } = useParams()
@@ -32,7 +32,7 @@ export default function TripLayout() {
         <div className="mx-4 mb-3 rounded-2xl bg-danger/10 p-4 text-sm text-danger" role="alert">
           <p className="font-bold">이 여행에 더 이상 접근할 수 없어요</p>
           <p className="mt-1">내보내졌거나 공유가 종료됐어요. 이 기기의 사본은 볼 수 있지만 더 이상 동기화되지 않고, 새로 고친 내용은 서버에 올라가지 않아요.</p>
-          <button className="mt-3 rounded-xl bg-danger px-4 py-2.5 font-semibold text-white" onClick={async () => { if (confirm('이 기기에 저장된 이 여행 사본과 서버에 올리지 못한 변경을 모두 삭제할까요? 되돌릴 수 없어요.')) { await discardLocalCopy(id); nav('/', { replace: true }) } }}>이 기기의 사본 삭제</button>
+          <button className="mt-3 rounded-xl bg-danger px-4 py-2.5 font-semibold text-white" onClick={async () => { if (await askConfirm('이 기기에 저장된 이 여행 사본과 서버에 올리지 못한 변경을 모두 삭제할까요?\n되돌릴 수 없어요.', { confirmLabel: '사본 삭제' })) { await discardLocalCopy(id); nav('/', { replace: true }) } }}>이 기기의 사본 삭제</button>
         </div>
       )}
       <div className="px-4"><Outlet context={trip} /></div>

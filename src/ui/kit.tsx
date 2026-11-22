@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ItemKind } from '../db/types'
 
 export const KIND_LABEL: Record<ItemKind, string> = {
@@ -33,6 +33,50 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
           <button className="grid h-9 w-9 place-content-center rounded-full bg-line/70 text-ink-2" onClick={onClose} aria-label="닫기">✕</button>
         </div>
         {children}
+      </div>
+    </div>
+  )
+}
+
+// ───────── 앱 안의 확인창 ─────────
+// 브라우저의 confirm() 은 일부 환경(앱 안 브라우저, 설치형 웹앱 등)에서 창을 띄우지 않고 바로 "취소"로 처리해서
+// 삭제 버튼이 아무 반응도 하지 않는다. 그래서 앱이 직접 그리는 확인창을 쓴다. 사용: if (await askConfirm('…', { confirmLabel: '삭제' })) { … }
+export interface ConfirmOptions { confirmLabel?: string; cancelLabel?: string; danger?: boolean }
+interface Pending { message: string; opts: ConfirmOptions; resolve: (ok: boolean) => void }
+let hostSet: ((p: Pending | null) => void) | null = null
+let queue: Pending[] = []
+
+export function askConfirm(message: string, opts: ConfirmOptions = {}): Promise<boolean> {
+  if (!hostSet) return Promise.resolve(typeof confirm === 'function' ? confirm(message) : false)   // 확인창 자리가 없는 환경(테스트 등)
+  return new Promise<boolean>((resolve) => {
+    const p: Pending = { message, opts, resolve }
+    if (queue.length === 0) hostSet!(p)        // 지금 떠 있는 창이 없으면 바로 보여준다
+    queue.push(p)                               // 여러 개가 겹치면 차례대로 보여준다
+  })
+}
+
+/** 앱 맨 위에 한 번만 둔다. */
+export function ConfirmHost() {
+  const [cur, setCur] = useState<Pending | null>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { hostSet = setCur; return () => { hostSet = null; queue.forEach((p) => p.resolve(false)); queue = [] } }, [])
+  useEffect(() => { if (cur) cancelRef.current?.focus() }, [cur])    // 실수로 엔터를 눌러도 삭제되지 않게 "취소"에 포커스를 둔다
+  if (!cur) return null
+  const done = (ok: boolean) => {
+    cur.resolve(ok)
+    queue.shift()
+    const next = queue[0] ?? null
+    setCur(next)
+  }
+  const danger = cur.opts.danger !== false
+  return (
+    <div className="scrim fixed inset-0 z-[70] grid place-content-center bg-ink/50 p-6 backdrop-blur-[2px]" onClick={() => done(false)} onKeyDown={(e) => e.key === 'Escape' && done(false)}>
+      <div role="alertdialog" aria-modal="true" aria-label="확인" className="sheet w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <p className="whitespace-pre-line text-[15px] leading-relaxed">{cur.message}</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button ref={cancelRef} type="button" className={btnGhost} onClick={() => done(false)}>{cur.opts.cancelLabel ?? '취소'}</button>
+          <button type="button" className={`${btn} ${danger ? 'bg-danger' : 'bg-ink'} text-white`} onClick={() => done(true)}>{cur.opts.confirmLabel ?? '확인'}</button>
+        </div>
       </div>
     </div>
   )

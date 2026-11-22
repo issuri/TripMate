@@ -14,12 +14,14 @@ import TripForm from './ui/TripForm'
 import TripHome from './ui/TripHome'
 import TripLayout from './ui/TripLayout'
 import TripList from './ui/TripList'
+import { ConfirmHost } from './ui/kit'
 
 export default function App() {
   return (
     <BrowserRouter>
       <ReminderHost />
       <SyncHost />
+      <ConfirmHost />
       <Routes>
         <Route path="/" element={<TripList />} />
         <Route path="/login" element={<LoginPage />} />

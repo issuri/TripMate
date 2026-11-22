@@ -12,7 +12,7 @@ import { dateIn } from '../lib/budget'
 import { gapMinutes } from '../lib/guide'
 import { listExpenses } from '../db/expenses'
 import ExpenseSheet from './ExpenseSheet'
-import { btnGhost, btnPrimary, Field, input, KIND_EMOJI, KIND_LABEL, Sheet } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Field, input, KIND_EMOJI, KIND_LABEL, Sheet } from './kit'
 
 const MODE = { walk: '🚶 도보', transit: '🚇 대중교통', drive: '🚗 차량' } as const
 
@@ -178,7 +178,7 @@ function ItemSheet({ trip, total, day, item, onClose, onAddExpense }: { trip: Tr
         {err && <p className="rounded-2xl bg-danger/10 p-3 text-sm text-danger" role="alert">{err}</p>}
         {item && <button type="button" className={`${btnGhost} w-full`} onClick={() => onAddExpense(item)}>💰 이 일정에 지출 추가</button>}
         <div className="flex gap-2">
-          {item && <button className={`${btnGhost} text-danger`} onClick={async () => { if (confirm('이 일정을 삭제할까요?')) { await deleteItem(item.id); onClose() } }}>삭제</button>}
+          {item && <button className={`${btnGhost} text-danger`} onClick={async () => { if (await askConfirm('이 일정을 삭제할까요?', { confirmLabel: '삭제' })) { await deleteItem(item.id); onClose() } }}>삭제</button>}
           <button className={`${btnPrimary} flex-1`} onClick={save}>저장</button>
         </div>
       </div>

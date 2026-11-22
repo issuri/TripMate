@@ -11,7 +11,7 @@ import { myRole } from '../sync/sharing'
 import { currencyLabel, CURRENCIES, otherCurrencies } from '../lib/locales'
 import { placeOf, type Place } from '../lib/places'
 import { FOREIGN_DEFAULT, HOME_CURRENCY, HOME_TZ, isDomestic } from '../lib/tripType'
-import { btnGhost, btnPrimary, Card, Field, input } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Card, Field, input } from './kit'
 import PlacePicker from './PlacePicker'
 
 const otherCurs = otherCurrencies()
@@ -188,7 +188,7 @@ function TripFormInner() {
       </div>
       {id && (
         <button className="w-full py-3 text-sm text-danger" onClick={async () => {
-          if (confirm('이 여행을 삭제할까요? 되돌릴 수 없습니다.')) { await deleteTrip(id); nav('/') }
+          if (await askConfirm('이 여행을 삭제할까요?\n일정, 경비, 준비물이 모두 사라지고 되돌릴 수 없어요.', { confirmLabel: '여행 삭제' })) { await deleteTrip(id); nav('/') }
         }}>여행 삭제</button>
       )}
     </main>

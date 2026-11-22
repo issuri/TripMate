@@ -11,7 +11,7 @@ import { listExpenses } from '../db/expenses'
 import { changedFields } from '../lib/diff'
 import ExpenseSheet from './ExpenseSheet'
 import { summarizeShopping } from '../lib/shopping'
-import { btnGhost, btnPrimary, Card, Field, input, Sheet } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Card, Field, input, Sheet } from './kit'
 
 export default function ShoppingPage() {
   const trip = useOutletContext<Trip>()
@@ -175,7 +175,7 @@ function ItemSheet({ trip, item, places, itinerary, onClose }: { trip: Trip; ite
         <Field label="메모"><input className={input} value={f.memo} onChange={set('memo')} /></Field>
         {err && <p className="rounded-2xl bg-danger/10 p-3 text-sm text-danger" role="alert">{err}</p>}
         <div className="flex gap-2">
-          {item && <button className={`${btnGhost} text-danger`} onClick={async () => { if (confirm('이 상품을 삭제할까요?')) { await deleteShopping(item.id); onClose() } }}>삭제</button>}
+          {item && <button className={`${btnGhost} text-danger`} onClick={async () => { if (await askConfirm('이 상품을 삭제할까요?', { confirmLabel: '삭제' })) { await deleteShopping(item.id); onClose() } }}>삭제</button>}
           <button className={`${btnPrimary} flex-1`} onClick={save}>저장</button>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { CURRENCIES, currencyLabel, otherCurrencies } from '../lib/locales'
 import { convertToHome, formatMinor, minorDigits, parseMajor, parseRateMicro } from '../lib/money'
 import { nameOf, peopleFor } from '../lib/people'
 import { rescaleSplits, splitEqual, validateSplits } from '../lib/split'
-import { btnGhost, btnPrimary, Field, input, Sheet } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Field, input, Sheet } from './kit'
 
 export interface ExpensePreset { categoryHint?: ItemKind; categoryId?: string; itineraryItemId?: string | null; shoppingItemId?: string | null; localMinor?: number; currency?: string; memo?: string }
 
@@ -199,7 +199,7 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
 
         {err && <p className="rounded-2xl bg-danger/10 p-3 text-sm text-danger" role="alert">{err}</p>}
         <div className="flex gap-2">
-          {editing && <button className={`${btnGhost} text-danger`} onClick={async () => { if (confirm('이 지출을 삭제할까요? 예산과 정산 결과가 바뀌어요.')) { await deleteExpense(expense!.id); onClose() } }}>삭제</button>}
+          {editing && <button className={`${btnGhost} text-danger`} onClick={async () => { if (await askConfirm('이 지출을 삭제할까요?\n예산과 정산 결과가 바뀌어요.', { confirmLabel: '삭제' })) { await deleteExpense(expense!.id); onClose() } }}>삭제</button>}
           <button className={`${btnPrimary} flex-1`} onClick={save}>저장</button>
         </div>
         {minorDigits(cur) > 0 && localMinor === null && local.trim() !== '' && <p className="text-xs text-danger">금액은 소수 {minorDigits(cur)}자리까지 입력할 수 있어요.</p>}

@@ -5,7 +5,7 @@ import { db } from '../db/local'
 import type { Trip } from '../db/types'
 import { discardRejected, downloadTrip, MAX_ATTEMPTS, pendingCount, removeOfflineCopy, resolveConflict, syncTrip } from '../sync/engine'
 import { getRemote, useSyncState } from '../sync/runtime'
-import { btnGhost, btnPrimary, Card } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Card } from './kit'
 
 const fmtTime = (ms: number | null | undefined) => (ms ? new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(ms) : '아직 없음')
 const fmtBytes = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`)
@@ -61,9 +61,9 @@ export default function OfflinePage() {
   const doDownload = () => run('download', async () => {
     try { const r = await downloadTrip(trip.id, remote!, undefined, (done, total, label) => setProgress({ done, total, label })); if (r.error) throw new Error(r.error); return '서버의 최신 여행 정보를 이 기기에 저장했어요.' } finally { setProgress(null) }
   })
-  const doDiscard = () => run('discard', async () => { if (!confirm('서버가 거부한 변경을 버리고 서버의 값으로 되돌릴까요?')) return '취소했어요.'; const r = await discardRejected(trip.id, remote!); if (r.error) throw new Error(r.error); return '서버의 값으로 되돌렸어요.' })
+  const doDiscard = () => run('discard', async () => { if (!(await askConfirm('서버가 거부한 변경을 버리고 서버의 값으로 되돌릴까요?', { confirmLabel: '되돌리기' }))) return '취소했어요.'; const r = await discardRejected(trip.id, remote!); if (r.error) throw new Error(r.error); return '서버의 값으로 되돌렸어요.' })
   const doRemove = () => run('remove', async () => {
-    if (!confirm('이 기기에 저장된 이 여행의 오프라인 데이터를 삭제할까요? 서버에는 남아 있고 다시 내려받을 수 있어요.')) return '취소했어요.'
+    if (!(await askConfirm('이 기기에 저장된 이 여행의 오프라인 데이터를 삭제할까요?\n서버에는 남아 있고 다시 내려받을 수 있어요.', { confirmLabel: '삭제' }))) return '취소했어요.'
     await removeOfflineCopy(trip.id, { synced: serverKnows })
     nav('/', { replace: true }); return ''
   })

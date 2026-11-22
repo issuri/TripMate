@@ -10,7 +10,7 @@ import type { Place, Trip } from '../db/types'
 import { daysBetween } from '../lib/dates'
 import { isDomestic } from '../lib/tripType'
 import { directionsUrl, OSM_ATTRIBUTION, OSM_TILE_URL, placeUrl, searchPlaces, type Found, type Pt } from '../lib/maps'
-import { btnGhost, btnPrimary, Card, Field, input, KIND_EMOJI } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Card, Field, input, KIND_EMOJI } from './kit'
 
 type Mode = 'walking' | 'transit' | 'driving'
 const MODES: [Mode, string][] = [['transit', '대중교통'], ['walking', '도보'], ['driving', '차량']]
@@ -96,7 +96,7 @@ export default function MapPage() {
               </div>
               <a href={placeUrl(toPt(p))} target="_blank" rel="noreferrer" className="rounded-full px-3 py-2 text-xs font-semibold text-signal">지도</a>
               <button className="rounded-full bg-signal-soft px-3 py-2 text-xs font-semibold text-signal" onClick={() => addItem(trip.id, { dayNumber: day, kind: 'sight', title: p.name, placeId: p.id })}>DAY {day}에 추가</button>
-              <button className="px-2 text-ink-3" aria-label="장소 삭제" onClick={() => confirm(`"${p.name}" 장소를 삭제할까요? 일정은 남고 장소 연결만 해제돼요.`) && deletePlace(p.id)}>✕</button>
+              <button className="px-2 text-ink-3" aria-label="장소 삭제" onClick={async () => (await askConfirm(`"${p.name}" 장소를 삭제할까요?\n일정은 남고 장소 연결만 해제돼요.`, { confirmLabel: '삭제' })) && deletePlace(p.id)}>✕</button>
             </li>
           ))}
         </ul>

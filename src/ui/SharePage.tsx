@@ -7,7 +7,7 @@ import { discardLocalCopy, syncTrip } from '../sync/engine'
 import { getRemote, sharing, syncConfigured } from '../sync/runtime'
 import { useAuth } from '../sync/auth'
 import { can, inviteLink, inviteMessage, myRole, refreshMembers, toSharingError, type InviteInfo } from '../sync/sharing'
-import { btnGhost, btnPrimary, Card } from './kit'
+import { askConfirm, btnGhost, btnPrimary, Card } from './kit'
 
 const fmt = (ms: number) => new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(ms)
 const EXPIRY: [string, number][] = [['1일', 24], ['3일', 72], ['7일', 168], ['30일', 720]]
@@ -88,7 +88,7 @@ export default function SharePage() {
                   <button className="rounded-full bg-paper px-3 py-2 text-xs font-semibold" disabled={busy !== null}
                     onClick={() => run('role', async () => { await sharing!.setRole(trip.id, m.userId, m.role === 'admin' ? 'member' : 'admin'); return m.role === 'admin' ? '동행자로 바꿨어요.' : '관리자로 지정했어요.' })}>{m.role === 'admin' ? '관리자 해제' : '관리자로'}</button>
                   <button className="rounded-full bg-danger/10 px-3 py-2 text-xs font-semibold text-danger" disabled={busy !== null}
-                    onClick={() => confirm(`${m.displayName || '이 사용자'}님을 내보낼까요? 바로 이 여행에 접근할 수 없게 돼요.`) && run('remove', async () => { await sharing!.removeMember(trip.id, m.userId); return '내보냈어요.' })}>내보내기</button>
+                    onClick={async () => (await askConfirm(`${m.displayName || '이 사용자'}님을 내보낼까요?\n바로 이 여행에 접근할 수 없게 돼요.`, { confirmLabel: '내보내기' })) && run('remove', async () => { await sharing!.removeMember(trip.id, m.userId); return '내보냈어요.' })}>내보내기</button>
                 </div>
               )}
             </li>
@@ -144,9 +144,9 @@ export default function SharePage() {
       <Card className="space-y-2">
         <h2 className="text-base font-bold">공유 관리</h2>
         {admin
-          ? <button className={`${btnGhost} w-full text-danger`} disabled={!online || busy !== null} onClick={() => confirm('공유를 종료할까요? 나를 뺀 모든 동행자가 내보내지고 모든 초대가 취소돼요. 여행 데이터는 나에게 남아요.') && run('end', async () => { const n = await sharing!.endSharing(trip.id); return `공유를 종료했어요. 동행자 ${n}명이 내보내졌어요.` })}>공유 종료</button>
+          ? <button className={`${btnGhost} w-full text-danger`} disabled={!online || busy !== null} onClick={async () => (await askConfirm('공유를 종료할까요?\n나를 뺀 모든 동행자가 내보내지고 모든 초대가 취소돼요. 여행 데이터는 나에게 남아요.', { confirmLabel: '공유 종료' })) && run('end', async () => { const n = await sharing!.endSharing(trip.id); return `공유를 종료했어요. 동행자 ${n}명이 내보내졌어요.` })}>공유 종료</button>
           : null}
-        <button className={`${btnGhost} w-full`} disabled={!online || busy !== null} onClick={() => confirm('이 여행에서 나갈까요? 나가면 이 여행에 접근할 수 없고 이 기기의 사본도 삭제돼요.') && run('leave', async () => { await sharing!.leave(trip.id); await discardLocalCopy(trip.id); nav('/', { replace: true }) })}>여행에서 나가기</button>
+        <button className={`${btnGhost} w-full`} disabled={!online || busy !== null} onClick={async () => (await askConfirm('이 여행에서 나갈까요?\n나가면 이 여행에 접근할 수 없고 이 기기의 사본도 삭제돼요.', { confirmLabel: '나가기' })) && run('leave', async () => { await sharing!.leave(trip.id); await discardLocalCopy(trip.id); nav('/', { replace: true }) })}>여행에서 나가기</button>
         <p className="px-1 text-xs text-ink-3">마지막 관리자는 나갈 수 없어요. 먼저 다른 사람을 관리자로 지정하거나 공유를 종료하세요.</p>
       </Card>
     </div>
