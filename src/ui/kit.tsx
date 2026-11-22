@@ -26,7 +26,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="scrim fixed inset-0 z-50 flex items-end justify-center bg-ink/40 backdrop-blur-[2px] md:items-center" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-      <div role="dialog" aria-label={title} className="sheet max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:rounded-[1.75rem]" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-label={title} className="sheet max-h-[92vh] max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:rounded-[1.75rem]" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line md:hidden" />
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold">{title}</h2>

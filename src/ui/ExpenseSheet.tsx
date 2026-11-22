@@ -173,7 +173,7 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
                         <input type="checkbox" className="h-5 w-5 accent-signal" checked={on} disabled={isExtra && !on} onChange={() => toggle(k)} aria-label={nameOf(k, people)} />
                         <span className="flex-1 text-sm">{nameOf(k, people)}</span>
                         {on && (mode === 'custom'
-                          ? <input inputMode="numeric" aria-label={`${nameOf(k, people)} 부담 금액`} className="num w-28 rounded-lg border-0 bg-white px-2 py-1.5 text-right text-sm ring-1 ring-line" value={custom[k] ?? ''} onChange={(e) => { dirty.current.split = true; setCustom({ ...custom, [k]: e.target.value }) }} />
+                          ? <input inputMode="numeric" aria-label={`${nameOf(k, people)} 부담 금액`} className="num w-32 rounded-lg border-0 bg-white px-2 py-1.5 text-right text-base ring-1 ring-line" value={custom[k] ?? ''} onChange={(e) => { dirty.current.split = true; setCustom({ ...custom, [k]: e.target.value }) }} />
                           : <span className="num text-sm text-ink-2">{amount !== undefined ? amount.toLocaleString('ko-KR') : '-'}원</span>)}
                       </li>
                     )

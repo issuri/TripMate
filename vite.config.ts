@@ -18,7 +18,6 @@ export default defineConfig({
         description: '여행 준비부터 귀국까지 올인원 여행 관리',
         lang: 'ko',
         display: 'standalone',
-        orientation: 'portrait',
         start_url: '/',
         theme_color: '#ffc4da',
         background_color: '#f8f4f7',
