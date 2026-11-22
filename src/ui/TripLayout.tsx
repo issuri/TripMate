@@ -1,9 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { db } from '../db/local'
-import { useAuth } from '../sync/auth'
 import { discardLocalCopy } from '../sync/engine'
-import { can, myRole } from '../sync/sharing'
+import { syncConfigured } from '../sync/runtime'
 import { askConfirm, Icon } from './kit'
 
 export default function TripLayout() {
@@ -11,8 +10,6 @@ export default function TripLayout() {
   const nav = useNavigate()
   // 존재하지 않는 여행은 undefined(=로딩 중)와 구분되도록 null로 바꾼다
   const trip = useLiveQuery(async () => (await db.trips.get(id)) ?? null, [id])
-  const auth = useAuth()
-  const role = useLiveQuery(() => myRole(id, undefined, auth.userId), [id, auth.userId]) ?? 'admin'
   const lost = useLiveQuery(async () => (await db.syncMeta.get(id))?.accessLost === true, [id])
   if (trip === undefined) return <p className="p-6 text-ink-2">불러오는 중…</p>
   if (!trip || trip.deletedAt) return <p className="p-6">여행을 찾을 수 없습니다. <Link className="text-signal underline" to="/">목록으로</Link></p>
@@ -23,15 +20,16 @@ export default function TripLayout() {
       <header className="flex items-center justify-between px-5 pb-1 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <Link to="/" className="grid h-10 w-10 place-content-center rounded-full bg-white text-xl text-ink-2 ring-1 ring-line" aria-label="여행 목록">‹</Link>
         <div className="flex gap-2">
-          <Link to={`/trips/${id}/share`} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink-2 ring-1 ring-line">공유</Link>
-          {can.editTripInfo(role) && <Link to={`/trips/${id}/edit`} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink-2 ring-1 ring-line">수정</Link>}
+          {/* 서버를 쓰는 경우에만: 내 기기끼리 동기화 상태와 오프라인 저장 관리 */}
+          {syncConfigured && <Link to={`/trips/${id}/offline`} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink-2 ring-1 ring-line">동기화</Link>}
+          <Link to={`/trips/${id}/edit`} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink-2 ring-1 ring-line">수정</Link>
         </div>
       </header>
       <h1 className="px-5 pb-3 pt-2 text-[28px] font-extrabold leading-tight tracking-tight">{trip.name}</h1>
       {lost && (
         <div className="mx-4 mb-3 rounded-2xl bg-danger/10 p-4 text-sm text-danger" role="alert">
           <p className="font-bold">이 여행에 더 이상 접근할 수 없어요</p>
-          <p className="mt-1">내보내졌거나 공유가 종료됐어요. 이 기기의 사본은 볼 수 있지만 더 이상 동기화되지 않고, 새로 고친 내용은 서버에 올라가지 않아요.</p>
+          <p className="mt-1">다른 계정으로 로그인했거나 서버에서 지워졌을 수 있어요. 이 기기의 사본은 볼 수 있지만 더 이상 동기화되지 않고, 새로 고친 내용은 서버에 올라가지 않아요.</p>
           <button className="mt-3 rounded-xl bg-danger px-4 py-2.5 font-semibold text-white" onClick={async () => { if (await askConfirm('이 기기에 저장된 이 여행 사본과 서버에 올리지 못한 변경을 모두 삭제할까요?\n되돌릴 수 없어요.', { confirmLabel: '사본 삭제' })) { await discardLocalCopy(id); nav('/', { replace: true }) } }}>이 기기의 사본 삭제</button>
         </div>
       )}

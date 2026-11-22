@@ -10,8 +10,6 @@ import { dateIn, summarizeBudget } from '../lib/budget'
 import { formatMinor, parseMajor } from '../lib/money'
 import { nameOf, peopleFor } from '../lib/people'
 import { balances, formatSettlement, minTransfers } from '../lib/settle'
-import { pendingCount } from '../sync/engine'
-import { useSyncState } from '../sync/runtime'
 import ExpenseSheet from './ExpenseSheet'
 import { btnGhost, btnPrimary, Card, Field, input, Sheet } from './kit'
 
@@ -29,9 +27,8 @@ export default function ExpensesPage() {
 
   const expenses = useLiveQuery(() => listExpenses(trip.id), [trip.id]) ?? []
   const categories = useLiveQuery(() => db.expenseCategories.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []
-  const members = useLiveQuery(() => db.members.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []
   const items = useLiveQuery(() => db.itineraryItems.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []
-  const people = useMemo(() => peopleFor(trip.companions, members), [trip.companions, members])
+  const people = useMemo(() => peopleFor(trip.companions), [trip.companions])
   const sum = useMemo(() => summarizeBudget({ totalBudgetMinor: trip.totalBudgetMinor, categories, expenses: expenses.length ? expenses : [], timeZone: trip.timeZone }), [trip.totalBudgetMinor, categories, expenses, trip.timeZone])
   const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? '삭제된 항목'
   const itemTitle = (id: string | null) => items.find((i) => i.id === id)?.title
@@ -103,7 +100,7 @@ export default function ExpensesPage() {
                           <p className="truncate font-semibold">{catName(e.categoryId)}{e.memo && <span className="font-normal text-ink-2"> · {e.memo}</span>}</p>
                           <p className="truncate text-xs text-ink-2">
                             <span className={`mr-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${e.money.shared ? 'bg-signal-soft text-signal' : 'bg-line text-ink-2'}`}>{e.money.shared ? '공동' : '개인'}</span>
-                            {e.money.payer ? `${nameOf(e.money.payer, people, members)} 결제` : ''}{e.paymentMethod && ` · ${e.paymentMethod}`}{itemTitle(e.itineraryItemId) && ` · ${itemTitle(e.itineraryItemId)}`}
+                            {e.money.payer ? `${nameOf(e.money.payer, people)} 결제` : ''}{e.paymentMethod && ` · ${e.paymentMethod}`}{itemTitle(e.itineraryItemId) && ` · ${itemTitle(e.itineraryItemId)}`}
                           </p>
                         </div>
                         <div className="num text-right">
@@ -167,31 +164,14 @@ function CategoryTab({ trip, rows, total }: { trip: Trip; rows: ReturnType<typeo
   )
 }
 
-function SettleTab({ trip, expenses, people, finished }: { trip: Trip; expenses: Expense[]; people: ReturnType<typeof peopleFor>; finished: boolean }) {
-  const sync = useSyncState()
-  const members = useLiveQuery(() => db.members.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []
-  const meta = useLiveQuery(() => db.syncMeta.get(trip.id), [trip.id])
-  const pending = useLiveQuery(() => pendingCount(trip.id), [trip.id, sync.lastReport]) ?? 0
-  const conflicts = useLiveQuery(() => db.conflicts.where('tripId').equals(trip.id).count(), [trip.id]) ?? 0
-  const [online, setOnline] = useState(navigator.onLine)
+function SettleTab({ expenses, people, finished }: { trip: Trip; expenses: Expense[]; people: ReturnType<typeof peopleFor>; finished: boolean }) {
   const [copied, setCopied] = useState(false)
-  useEffect(() => { const u = () => setOnline(navigator.onLine); addEventListener('online', u); addEventListener('offline', u); return () => { removeEventListener('online', u); removeEventListener('offline', u) } }, [])
 
   const shared = expenses.filter((e) => e.money.shared)
   const bal = useMemo(() => balances(shared), [shared])
   const transfers = useMemo(() => minTransfers(bal), [bal])
-  // 계정을 가진 동행자와 함께하는 여행은 모든 참여자의 데이터가 동기화된 뒤에 최종 정산한다
-  const multi = members.filter((m) => m.status === 'active').length > 1
-  const blockers: string[] = []
-  if (multi) {
-    if (!online) blockers.push('오프라인이에요')
-    if (pending > 0) blockers.push(`아직 서버에 올리지 않은 변경이 ${pending}건 있어요`)
-    if (conflicts > 0) blockers.push(`해결하지 않은 충돌이 ${conflicts}건 있어요`)
-    if (!meta?.lastSyncAt || meta.lastError) blockers.push('최근 동기화에 실패했거나 아직 동기화하지 않았어요')
-    if (meta?.accessLost) blockers.push('이 여행에 더 이상 접근할 수 없어요')
-  }
-  const ready = blockers.length === 0
-  const name = (k: string) => nameOf(k, people, members)
+  const ready = true       // 동반자는 이름만 적어 두므로, 이 기기의 기록만으로 바로 정산할 수 있다
+  const name = (k: string) => nameOf(k, people)
   const text = formatSettlement(transfers, name, (n) => n.toLocaleString('ko-KR'))
 
   const paid = (k: string) => shared.filter((e) => e.money.payer === k).reduce((a, e) => a + e.money.homeMinor, 0)
@@ -205,7 +185,6 @@ function SettleTab({ trip, expenses, people, finished }: { trip: Trip; expenses:
           <h2 className="text-base font-bold">{finished && ready ? '최종 정산 결과' : '현재까지의 정산'}</h2>
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${ready ? 'bg-mint/15 text-mint' : 'bg-coral/15 text-coral'}`}>{ready ? (finished ? '최종' : '중간') : '임시'}</span>
         </div>
-        {!ready && <div className="mt-3 rounded-2xl bg-coral/10 p-3 text-sm text-coral" role="alert"><p className="font-semibold">모든 참여자의 데이터가 동기화된 뒤에 확정돼요</p><ul className="mt-1 list-disc pl-5">{blockers.map((b) => <li key={b}>{b}</li>)}</ul></div>}
         {shared.length === 0 && <p className="mt-3 text-sm text-ink-2">공동 경비가 없어요. 지출을 등록할 때 "공동 경비"를 켜면 여기서 정산해요.</p>}
         {shared.length > 0 && (
           <>

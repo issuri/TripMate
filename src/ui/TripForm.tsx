@@ -6,8 +6,6 @@ import { setRemindersEnabled } from '../db/reminders'
 import { updateTrip } from '../db/itinerary'
 import { createTrip, deleteTrip, validateTrip } from '../db/trips'
 import { changedFields } from '../lib/diff'
-import { useAuth } from '../sync/auth'
-import { myRole } from '../sync/sharing'
 import { currencyLabel, CURRENCIES, otherCurrencies } from '../lib/locales'
 import { placeOf, type Place } from '../lib/places'
 import { FOREIGN_DEFAULT, HOME_CURRENCY, HOME_TZ, isDomestic } from '../lib/tripType'
@@ -27,8 +25,6 @@ function TripFormInner() {
   const { id } = useParams()
   const nav = useNavigate()
   const existing = useLiveQuery(() => (id ? db.trips.get(id) : undefined), [id])
-  const auth = useAuth()
-  const role = useLiveQuery(() => (id ? myRole(id, undefined, auth.userId) : 'admin'), [id, auth.userId])
   const [f, setF] = useState({ name: '', country: DEFAULT_COUNTRY, city: '', startDate: '', endDate: '', timeZone: FOREIGN_DEFAULT.timeZone, purpose: '', companions: '', localCurrency: FOREIGN_DEFAULT.localCurrency, coverImage: '' })
   const [abroad, setAbroad] = useState(true)   // 해외 여행(기본) / 국내 여행. 국내 여행은 한국 시간대와 원화로 정해진다
   const [editCountry, setEditCountry] = useState(false)
@@ -122,16 +118,6 @@ function TripFormInner() {
     } catch (e) { setErr((e as Error).message); submitting.current = false; setBusy(false) }
   }
 
-  // 여행 기본 정보는 관리자만 고칠 수 있다(서버도 같은 규칙으로 거부한다). 일반 동행자에게는 이유를 알려준다.
-  if (id && role && role !== 'admin') {
-    return (
-      <main className="mx-auto max-w-lg space-y-4 px-4 pt-[calc(1.5rem+env(safe-area-inset-top))]">
-        <h1 className="px-1 text-[28px] font-extrabold tracking-tight">여행 수정</h1>
-        <Card><p className="font-semibold">관리자만 고칠 수 있어요</p><p className="mt-2 text-sm text-ink-2">여행 이름, 날짜, 국가·도시 같은 기본 정보는 관리자만 바꿀 수 있어요. 일정, 쇼핑 리스트, 준비물은 함께 고칠 수 있어요.</p></Card>
-        <button className={`${btnGhost} w-full`} onClick={() => nav(-1)}>돌아가기</button>
-      </main>
-    )
-  }
   return (
     <main className="mx-auto max-w-lg space-y-4 px-4 pb-10 pt-[calc(1.5rem+env(safe-area-inset-top))]">
       <h1 className="px-1 text-[28px] font-extrabold tracking-tight">{id ? '여행 수정' : '새 여행'}</h1>

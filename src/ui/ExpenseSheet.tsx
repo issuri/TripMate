@@ -22,12 +22,11 @@ const plain = (minor: number, cur: string) => formatMinor(minor, cur).replace(/,
  */
 export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip: Trip; expense?: Expense; preset?: ExpensePreset; onClose: () => void }) {
   const categories = (useLiveQuery(() => db.expenseCategories.where('tripId').equals(trip.id).filter((c) => !c.deletedAt).toArray(), [trip.id]) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)
-  const members = useLiveQuery(() => db.members.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []
   const items = (useLiveQuery(() => db.itineraryItems.where('tripId').equals(trip.id).filter((i) => !i.deletedAt).toArray(), [trip.id]) ?? []).sort((a, b) => a.dayNumber - b.dayNumber || a.sortOrder - b.sortOrder)
-  const people = useMemo(() => peopleFor(trip.companions, members), [trip.companions, members])
+  const people = useMemo(() => peopleFor(trip.companions), [trip.companions])
   const m0 = expense?.money
   const editing = !!expense
-  const lockShared = !!expense && expense.money.shared && expense.version > 0   // 이미 공유된 공동 경비는 개인 경비로 바꿀 수 없다
+  const lockShared = !!expense && expense.money.shared && expense.version > 0   // 이미 서버에 올린 공동 경비는 개인 경비로 바꿀 수 없다
 
   const [local, setLocal] = useState(m0 ? plain(m0.localMinor, m0.currency) : preset?.localMinor ? plain(preset.localMinor, preset.currency ?? trip.localCurrency) : '')
   const [cur, setCur] = useState(m0?.currency ?? preset?.currency ?? trip.localCurrency)
@@ -116,7 +115,7 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
     } catch (e) { setErr((e as Error).message); busy.current = false }
   }
 
-  const extra = (expense?.money.splits ?? []).map((s) => s.k).filter((k) => !people.some((p) => p.key === k))   // 내보내졌거나 나간 사람(기존 기록 유지용)
+  const extra = (expense?.money.splits ?? []).map((s) => s.k).filter((k) => !people.some((p) => p.key === k))   // 여행 정보에서 지운 동반자(기존 기록 유지용)
   const allKeys = [...people.map((p) => p.key), ...extra]
 
   return (
@@ -153,15 +152,15 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
 
         <div className="rounded-2xl bg-white p-3 ring-1 ring-line">
           <label className="flex items-center justify-between gap-3">
-            <span><span className="font-semibold">공동 경비</span><span className="block text-xs text-ink-2">{shared ? '함께 나눠 내는 지출이에요. 정산에 포함돼요.' : '나만 쓰는 개인 경비예요. 다른 동행자에게는 보이지 않아요.'}</span></span>
+            <span><span className="font-semibold">공동 경비</span><span className="block text-xs text-ink-2">{shared ? '함께 나눠 내는 지출이에요. 정산에 포함돼요.' : '나만 쓰는 개인 경비예요. 정산에 포함되지 않아요.'}</span></span>
             <input type="checkbox" className="h-6 w-6 accent-signal" checked={shared} disabled={lockShared} onChange={(e) => setShared(e.target.checked)} aria-label="공동 경비" />
           </label>
-          {lockShared && <p className="mt-2 text-xs text-ink-3">이미 공유된 공동 경비는 개인 경비로 바꿀 수 없어요. 삭제한 뒤 개인 경비로 다시 등록하세요.</p>}
+          {lockShared && <p className="mt-2 text-xs text-ink-3">이미 서버에 올린 공동 경비는 개인 경비로 바꿀 수 없어요. 삭제한 뒤 개인 경비로 다시 등록하세요.</p>}
 
           {shared && (
             <div className="mt-3 space-y-3">
               <Field label="결제한 사람"><select className={input} value={payer} onChange={(e) => setPayer(e.target.value)}>
-                {[...new Set([payer, ...allKeys])].map((k) => <option key={k} value={k}>{nameOf(k, people, members)}</option>)}</select></Field>
+                {[...new Set([payer, ...allKeys])].map((k) => <option key={k} value={k}>{nameOf(k, people)}</option>)}</select></Field>
               <div>
                 <p className="mb-1.5 px-1 text-[13px] font-medium text-ink-2">함께 나눌 사람</p>
                 <ul className="space-y-1.5">
@@ -171,10 +170,10 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
                     const amount = splits.find((x) => x.k === k)?.s
                     return (
                       <li key={k} className="flex items-center gap-3 rounded-xl bg-paper px-3 py-2.5">
-                        <input type="checkbox" className="h-5 w-5 accent-signal" checked={on} disabled={isExtra && !on} onChange={() => toggle(k)} aria-label={nameOf(k, people, members)} />
-                        <span className="flex-1 text-sm">{nameOf(k, people, members)}</span>
+                        <input type="checkbox" className="h-5 w-5 accent-signal" checked={on} disabled={isExtra && !on} onChange={() => toggle(k)} aria-label={nameOf(k, people)} />
+                        <span className="flex-1 text-sm">{nameOf(k, people)}</span>
                         {on && (mode === 'custom'
-                          ? <input inputMode="numeric" aria-label={`${nameOf(k, people, members)} 부담 금액`} className="num w-28 rounded-lg border-0 bg-white px-2 py-1.5 text-right text-sm ring-1 ring-line" value={custom[k] ?? ''} onChange={(e) => { dirty.current.split = true; setCustom({ ...custom, [k]: e.target.value }) }} />
+                          ? <input inputMode="numeric" aria-label={`${nameOf(k, people)} 부담 금액`} className="num w-28 rounded-lg border-0 bg-white px-2 py-1.5 text-right text-sm ring-1 ring-line" value={custom[k] ?? ''} onChange={(e) => { dirty.current.split = true; setCustom({ ...custom, [k]: e.target.value }) }} />
                           : <span className="num text-sm text-ink-2">{amount !== undefined ? amount.toLocaleString('ko-KR') : '-'}원</span>)}
                       </li>
                     )

@@ -77,7 +77,7 @@ export async function updateExpense(id: string, patch: Partial<ExpenseInput>, db
     const err = validateMoney(next.money)
     if (err) throw new Error(err)
     // 이미 서버에 올라가 다른 사람에게 보일 수 있는 공동 경비는 개인 경비로 바꿀 수 없다(서버도 거부한다). 삭제 후 다시 등록한다.
-    if (cur.money.shared && !next.money.shared && cur.version > 0) throw new Error('이미 공유된 공동 경비는 개인 경비로 바꿀 수 없어요. 삭제한 뒤 개인 경비로 다시 등록하세요.')
+    if (cur.money.shared && !next.money.shared && cur.version > 0) throw new Error('이미 서버에 올린 공동 경비는 개인 경비로 바꿀 수 없어요. 삭제한 뒤 개인 경비로 다시 등록하세요.')
     checkText(next)
     if (Object.keys(diff).length === 0) return
     if (diff.categoryId || diff.itineraryItemId || diff.shoppingItemId) await checkLinks(db, cur.tripId, next.categoryId, next.itineraryItemId, next.shoppingItemId)

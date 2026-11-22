@@ -8,8 +8,7 @@ do $$
 declare f text;
 begin
   foreach f in array array[
-    'is_trip_member(uuid)', 'is_trip_admin(uuid)', 'trip_has_members(uuid)', 'exp_person_ok(uuid,text)',
-    'require_auth()', 'norm_code(text)', 'hash_code(text)'] loop
+    'is_trip_member(uuid)', 'is_trip_admin(uuid)', 'trip_has_members(uuid)', 'exp_person_ok(uuid,text)'] loop
     execute format('revoke all on function public.%s from public', f);
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;

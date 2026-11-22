@@ -29,7 +29,7 @@ export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: {
     if (!remote) return set({ status: 'unconfigured' })
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return set({ status: 'offline' })
     set({ status: 'syncing' })
-    // 초대받았거나 다른 기기에서 만든 여행이 서버에 있으면 먼저 내려받는다(실패해도 이미 있는 여행의 동기화는 계속)
+    // 다른 기기에서 만든 여행이 서버에 있으면 먼저 내려받는다(실패해도 이미 있는 여행의 동기화는 계속)
     await opts.discover?.(remote).catch(() => undefined)
     // 삭제한 여행은 삭제가 서버에 전달될 때까지만(보낼 변경이 남아 있을 때만) 동기화한다
     const trips = await db.trips.toArray()
@@ -40,7 +40,7 @@ export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: {
     for (const id of ids) {
       last = await syncTrip(id, remote, db)
       if (last.error && /네트워크/.test(last.error)) { net = true; break }
-      await opts.afterTrip?.(id).catch(() => undefined) // 예: 동행자 목록 새로고침(실패해도 동기화 결과에는 영향 없음)
+      await opts.afterTrip?.(id).catch(() => undefined) // 동기화 뒤에 할 보조 작업(실패해도 동기화 결과에는 영향 없음)
     }
     set({ status: net ? 'offline' : last?.error ? 'error' : 'idle', lastReport: last })
   }

@@ -12,7 +12,7 @@ export function createSupabase(): SupabaseClient | null {
 const isNetwork = (msg: string) => (typeof navigator !== 'undefined' && navigator.onLine === false) || /failed to fetch|network|load failed|timeout/i.test(msg)
 const PAGE = 500
 
-const WATCHED = ['trips', 'places', 'itinerary_items', 'checklist_items', 'shopping_items', 'expense_categories', 'expenses', 'trip_members'] as const
+const WATCHED = ['trips', 'places', 'itinerary_items', 'checklist_items', 'shopping_items', 'expense_categories', 'expenses'] as const
 
 /**
  * 다른 사람이 여행을 바꾸면 알림을 받는다(Supabase Realtime). RLS가 적용되어 참여 중인 멤버의 변경만 온다.

@@ -68,11 +68,10 @@ describe('SQL migrations', () => {
   })
 
   it('members can edit; only admins manage members; version increments on update', async () => {
-    // 멤버 추가는 초대 코드(RPC)로만 가능하다 (직접 INSERT는 막혀 있다: sharing.sql.test.ts 참고)
-    await as(A)
-    const code = (await pg.query<{ c: string }>(`select public.create_invite('${TRIP}'::uuid, 24, 5) as c`)).rows[0].c
+    // 제품에는 멤버를 늘리는 기능이 없다(사용자의 직접 INSERT도 막혀 있다). 서버 규칙이 멤버 단위로 지켜지는지 보려고 시험용으로 직접 넣는다.
+    await pg.exec('reset role')
+    await pg.exec(`insert into trip_members (trip_id, user_id, role) values ('${TRIP}', '${B}', 'member')`)
     await as(B)
-    await pg.query(`select public.join_trip($1)`, [code])
     expect((await pg.query(`select id from trips`)).rows).toHaveLength(1)
     await pg.exec(`update itinerary_items set completed = true where trip_id='${TRIP}'`)
     const v = await pg.query<{ version: number; completed: boolean }>(`select version, completed from itinerary_items where trip_id='${TRIP}'`)

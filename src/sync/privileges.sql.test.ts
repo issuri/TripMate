@@ -30,7 +30,6 @@ describe('helper functions are not open to the public', () => {
     await denied(null, `select public.is_trip_admin('${TRIP}')`)
     await denied(null, `select public.trip_has_members('${TRIP}')`)
     await denied(null, `select public.exp_person_ok('${TRIP}', '${U.A}')`)
-    await denied(null, `select public.hash_code('x')`)
   })
   it('logged-in users still can (row security policies depend on it)', async () => {
     await s.as(U.A)
@@ -41,17 +40,33 @@ describe('helper functions are not open to the public', () => {
 
 describe('anonymous users', () => {
   it('cannot read or write any table, even when the database default would allow it', async () => {
-    for (const t of ['trips', 'trip_members', 'trip_invites', 'itinerary_items', 'places', 'expenses', 'profiles', 'join_attempts']) {
+    for (const t of ['trips', 'trip_members', 'itinerary_items', 'places', 'checklist_items', 'shopping_items', 'expense_categories', 'expenses']) {
       await s.as(null)
       await expect(s.pg.query(`select * from ${t}`), `select ${t}`).rejects.toThrow()
       await s.admin()
     }
     await denied(null, `insert into trips (id, owner_id, name, start_date, end_date, time_zone) values (gen_random_uuid(), '${U.A}', 'x', '2030-01-01', '2030-01-02', 'UTC')`)
   })
-  it('cannot call any sharing or sync function', async () => {
-    await denied(null, `select public.create_invite('${TRIP}')`)
-    await denied(null, `select public.join_trip('ABCD-EFGH')`)
+  it('cannot call the sync function', async () => {
     await denied(null, `select public.sync_apply('places', gen_random_uuid(), 'upsert', 0, '{}'::jsonb, 'dev')`)
+  })
+})
+
+describe('the sharing feature is gone from the server', () => {
+  it('has no invite, join, member-management or profile functions', async () => {
+    await s.admin()
+    const fns = (await s.pg.query<{ proname: string }>(`select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`)).rows.map((r) => r.proname)
+    for (const f of ['create_invite', 'join_trip', 'revoke_invite', 'list_members', 'set_member_role', 'remove_member', 'leave_trip', 'end_sharing', 'upsert_profile', 'hash_code', 'norm_code', 'require_auth']) {
+      expect(fns, f).not.toContain(f)
+    }
+    for (const f of ['sync_apply', 'is_trip_member', 'exp_person_ok']) expect(fns, f).toContain(f)      // 남겨야 할 것은 그대로
+  })
+  it('has no invite or profile tables, and a signed-in user cannot add members to a trip, even their own', async () => {
+    await s.admin()
+    const tables = (await s.pg.query<{ tablename: string }>(`select tablename from pg_tables where schemaname = 'public'`)).rows.map((r) => r.tablename)
+    for (const t of ['trip_invites', 'join_attempts', 'profiles']) expect(tables, t).not.toContain(t)
+    await denied(U.A, `insert into trip_members (trip_id, user_id, role) values ('${TRIP}', '${U.C}', 'member')`)
+    await denied(U.C, `insert into trip_members (trip_id, user_id, role) values ('${TRIP}', '${U.C}', 'admin')`)
   })
 })
 
@@ -65,8 +80,8 @@ describe('users outside the trip', () => {
     const r = await s.pg.query<{ name: string }>(`select name from trips where id = '${TRIP}'`)
     expect(r.rows[0].name).toBe('비공개 여행')
     await s.as(U.C)
-    await expect(s.pg.query(`select public.create_invite('${TRIP}')`)).rejects.toThrow()
-    await expect(s.pg.query(`select * from public.list_members('${TRIP}')`)).rejects.toThrow()
+    // 다른 사람의 여행에는 동기화 함수로도 쓸 수 없다
+    await expect(s.pg.query(`select public.sync_apply('places', gen_random_uuid(), 'upsert', 0, $1::jsonb, 'dev')`, [JSON.stringify({ trip_id: TRIP, name: 'x', lat: 1, lng: 1 })])).rejects.toThrow()
     await s.admin()
   })
 })

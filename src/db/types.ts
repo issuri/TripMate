@@ -139,19 +139,7 @@ export interface SyncMeta2 {
   lastPushAt: number | null
   offlineSavedAt: number | null // "오프라인 저장"(전체 내려받기)을 완료한 시각
   lastError: string | null
-  accessLost?: boolean     // 서버가 이 여행에 대한 접근을 막음(내보내짐/공유 종료). 더 이상 동기화하지 않는다
-}
-
-/** 여행 멤버 목록의 이 기기 사본(오프라인에서도 동행자를 볼 수 있게). 서버가 기준이며 동기화 엔진이 아닌 별도로 갱신한다. */
-export interface MemberRow {
-  id: string               // `${tripId}:${userId}`
-  tripId: string
-  userId: string
-  displayName: string
-  role: 'admin' | 'member'
-  status: 'active' | 'left' | 'removed'
-  joinedAt: number
-  isMe: boolean
+  accessLost?: boolean     // 서버가 이 여행에 대한 접근을 막음(다른 계정으로 로그인했거나 서버에서 지워짐). 더 이상 동기화하지 않는다
 }
 
 /**

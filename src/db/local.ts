@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, MemberRow, OutboxEntry, Place, Reminder, ShoppingItem, SyncConflict, SyncMeta2, Trip,
+  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, OutboxEntry, Place, Reminder, ShoppingItem, SyncConflict, SyncMeta2, Trip,
 } from './types'
 
 export class TripMateDB extends Dexie {
@@ -15,7 +15,6 @@ export class TripMateDB extends Dexie {
   reminders!: Table<Reminder, string>
   syncMeta!: Table<SyncMeta2, string>
   conflicts!: Table<SyncConflict, string>
-  members!: Table<MemberRow, string>
   exclusions!: Table<{ tripId: string; at: number }, string>
   remindersOff!: Table<{ tripId: string; at: number }, string>
 
@@ -42,6 +41,8 @@ export class TripMateDB extends Dexie {
     this.version(5).stores({ exclusions: 'tripId' })
     // v6: 이 기기에서 알림을 끈 여행(알림은 기기마다 따로 설정한다. 서버에는 올리지 않는다)
     this.version(6).stores({ remindersOff: 'tripId' })
+    // v7: 동행자 공유 기능을 없애면서 멤버 사본 테이블도 지운다(null = 테이블 삭제)
+    this.version(7).stores({ members: null })
   }
 }
 

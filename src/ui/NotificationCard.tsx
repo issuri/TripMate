@@ -52,7 +52,7 @@ export default function NotificationCard({ trip }: { trip: Trip }) {
       </label>
 
       {off ? (
-        <p className="mt-3 text-xs text-ink-3">알림은 기기마다 따로 설정해요. 다른 기기나 동행자의 알림에는 영향이 없어요. 일정마다 정한 알림 설정은 그대로 남아 있어서, 다시 켜면 그 설정대로 알려드려요.</p>
+        <p className="mt-3 text-xs text-ink-3">알림은 기기마다 따로 설정해요. 다른 기기의 알림에는 영향이 없어요. 일정마다 정한 알림 설정은 그대로 남아 있어서, 다시 켜면 그 설정대로 알려드려요.</p>
       ) : (<>
       {needsInstall && (
         <p className="mt-3 rounded-2xl bg-signal-soft p-3 text-sm text-signal">

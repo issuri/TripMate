@@ -18,15 +18,15 @@ export interface RemoteAdapter {
   pull(table: string, tripId: string, sinceMs: number): Promise<RemoteRow[]>
   /**
    * 이 사용자가 지금 이 여행에 접근할 수 있는지('ok'/'denied'). 네트워크 문제는 SyncNetworkError.
-   * 내보내졌거나 공유가 종료되면 서버(RLS)가 여행 행을 숨기므로 'denied'가 된다.
+   * 다른 계정으로 로그인했거나 서버에서 지워지면 서버(RLS)가 여행 행을 숨기므로 'denied'가 된다.
    */
   access?(tripId: string): Promise<'ok' | 'denied'>
-  /** 내가 접근할 수 있는(참여 중인) 여행 id 목록. 다른 기기에서 만들었거나 초대받은 여행을 찾는 데 쓴다. */
+  /** 내가 접근할 수 있는 여행 id 목록. 다른 기기에서 만든 여행을 찾는 데 쓴다. */
   listTrips?(): Promise<string[]>
 }
 
 export const DEFAULT_TIMEOUT_MS = 30_000
-export const ACCESS_LOST = '이 여행에 더 이상 접근할 수 없어요(내보내졌거나 공유가 종료됐어요).'
+export const ACCESS_LOST = '이 여행에 더 이상 접근할 수 없어요(다른 계정으로 로그인했거나 서버에서 지워졌어요).'
 
 /** 응답이 오지 않는 서버 때문에 동기화(그리고 이를 직렬화하는 잠금)가 영원히 멈추지 않도록 시간 제한을 둔다. */
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -239,7 +239,7 @@ export function syncTrip(tripId: string, remote: RemoteAdapter, db: TripMateDB =
     const report: SyncReport = { pushed: 0, conflicts: 0, pulled: 0, stuck: 0, error: null, at: Date.now() }
     try {
       const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
-      // 서버가 이미 아는 여행인데 접근이 막혔다면(내보내짐·공유 종료) 더 보내거나 받지 않고, 이 기기의 사본을 어떻게 할지 사용자가 정하게 한다.
+      // 서버가 이미 아는 여행인데 접근이 막혔다면(다른 계정·서버에서 삭제) 더 보내거나 받지 않고, 이 기기의 사본을 어떻게 할지 사용자가 정하게 한다.
       const localTrip = await db.trips.get(tripId)
       const knownToServer = !!localTrip && (localTrip.version > 0 || !!(await getMeta(db, tripId)).lastSyncAt)
       if (remote.access && knownToServer) {
@@ -250,7 +250,7 @@ export function syncTrip(tripId: string, remote: RemoteAdapter, db: TripMateDB =
           report.error = ACCESS_LOST
           return report
         }
-        if (m0.accessLost) await db.syncMeta.put({ ...m0, accessLost: false, lastError: null }) // 다시 초대받아 접근이 복구됨
+        if (m0.accessLost) await db.syncMeta.put({ ...m0, accessLost: false, lastError: null }) // 접근이 복구됨
       }
       await pushTrip(db, remote, tripId, report, timeoutMs)
       await db.syncMeta.put({ ...(await getMeta(db, tripId)), lastPushAt: Date.now() })
@@ -268,7 +268,7 @@ export function syncTrip(tripId: string, remote: RemoteAdapter, db: TripMateDB =
 }
 
 /**
- * 서버에는 있는데 이 기기에 없는 여행(다른 기기에서 만들었거나 초대로 참여한 여행)을 찾아 내려받는다.
+ * 서버에는 있는데 이 기기에 없는 여행(다른 기기에서 만든 여행)을 찾아 내려받는다.
  * 사용자가 이 기기에서 일부러 사본을 지운 여행은 다시 내려받지 않는다.
  */
 export async function discoverTrips(remote: RemoteAdapter, db: TripMateDB = defaultDb, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<string[]> {
@@ -332,7 +332,7 @@ export async function discardRejected(tripId: string, remote: RemoteAdapter, db:
  * 접근이 막힌 여행의 이 기기 사본을 정리한다. 서버에 올릴 수 없는 변경도 함께 버리므로 사용자가 확인한 뒤에만 호출한다.
  */
 export async function discardLocalCopy(tripId: string, db: TripMateDB = defaultDb) {
-  await db.transaction('rw', [...ENTITIES.map((e) => table(db, e)), db.syncMeta, db.conflicts, db.reminders, db.expenses, db.members, db.outbox, db.exclusions], async () => {
+  await db.transaction('rw', [...ENTITIES.map((e) => table(db, e)), db.syncMeta, db.conflicts, db.reminders, db.expenses, db.outbox, db.exclusions], async () => {
     const ownerOf = async (e: EntityDef, id: string) => (e.table === 'trips' ? id : ((await table(db, e).get(id))?.tripId as string | undefined))
     for (const q of await db.outbox.toArray()) {
       const def = entityByTable(q.table); if (!def) continue
@@ -343,7 +343,7 @@ export async function discardLocalCopy(tripId: string, db: TripMateDB = defaultD
       else await table(db, e).where('tripId').equals(tripId).delete()
     }
     await db.expenses.where('tripId').equals(tripId).delete(); await db.conflicts.where('tripId').equals(tripId).delete()
-    await db.members.where('tripId').equals(tripId).delete(); await db.reminders.where('tripId').equals(tripId).delete(); await db.syncMeta.delete(tripId)
+    await db.reminders.where('tripId').equals(tripId).delete(); await db.syncMeta.delete(tripId)
     await db.exclusions.put({ tripId, at: Date.now() })
   })
 }
@@ -364,13 +364,12 @@ export async function removeOfflineCopy(tripId: string, opts: { synced: boolean 
   if (!opts.synced) throw new Error('서버에 저장되지 않은 여행이라 삭제하면 복구할 수 없어요.')
   if ((await pendingCount(tripId, db)) > 0) throw new Error('아직 서버에 올리지 않은 변경이 있어요. 동기화한 뒤 삭제하세요.')
   if ((await db.conflicts.where('tripId').equals(tripId).count()) > 0) throw new Error('해결하지 않은 충돌이 있어요.')
-  await db.transaction('rw', [...ENTITIES.map((e) => table(db, e)), db.syncMeta, db.conflicts, db.reminders, db.expenses, db.members, db.exclusions], async () => {
+  await db.transaction('rw', [...ENTITIES.map((e) => table(db, e)), db.syncMeta, db.conflicts, db.reminders, db.expenses, db.exclusions], async () => {
     for (const e of ENTITIES) {
       if (e.table === 'trips') await db.trips.delete(tripId)
       else await table(db, e).where('tripId').equals(tripId).delete()
     }
     await db.expenses.where('tripId').equals(tripId).delete()
-    await db.members.where('tripId').equals(tripId).delete()
     await db.syncMeta.delete(tripId); await db.reminders.where('tripId').equals(tripId).delete()
     await db.exclusions.put({ tripId, at: Date.now() }) // 사용자가 지운 사본은 자동으로 다시 내려받지 않는다
   })

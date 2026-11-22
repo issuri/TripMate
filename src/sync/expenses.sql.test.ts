@@ -16,11 +16,13 @@ const insert = async (uid: string, m: string, id = 'gen_random_uuid()') => {
   await s.pg.exec(`insert into expenses (id, trip_id, category_id, money) values (${id}, '${TRIP}', '${CAT}', '${m}'::jsonb)`)
 }
 const rows = async (uid: string) => { await s.as(uid); return (await s.pg.query<{ id: string }>(`select id from expenses`)).rows }
-const invite = async (uid: string) => { const c = await s.rpc<string>(U.A, 'create_invite', [TRIP, 24, 5]); await s.rpc<unknown>(uid, 'join_trip', [c]) }
+// 제품에는 멤버를 늘리는 기능이 없지만, 서버의 접근 규칙(RLS)은 여전히 멤버 단위라서 시험용으로 멤버를 직접 넣어 확인한다.
+const invite = async (uid: string) => { await s.admin(); await s.pg.exec(`insert into trip_members (trip_id, user_id, role, status) values ('${TRIP}', '${uid}', 'member', 'active')`) }
+const removeMember = async (uid: string) => { await s.admin(); await s.pg.exec(`update trip_members set status = 'removed' where trip_id = '${TRIP}' and user_id = '${uid}'`) }
 
 beforeAll(async () => { s = await createTestServer() })
 beforeEach(async () => {
-  await s.admin(); await s.pg.exec('truncate trip_members, trip_invites, join_attempts, trips, profiles, expenses, expense_categories cascade')
+  await s.admin(); await s.pg.exec('truncate trip_members, trips, expenses, expense_categories cascade')
   await s.as(U.A)
   await s.pg.exec(`insert into trips (id, owner_id, name, start_date, end_date) values ('${TRIP}', '${U.A}', '도쿄', '2030-05-10', '2030-05-12')`)
   await s.pg.exec(`insert into expense_categories (id, trip_id, name) values ('${CAT}', '${TRIP}', '식비')`)
@@ -83,7 +85,7 @@ describe('money validation trigger', () => {
   it('a removed member stays valid in expenses they were already part of, but cannot be added to new ones', async () => {
     const id = '50000000-0000-0000-0000-00000000000a'
     await insert(U.A, money({ shared: true, payer: U.B, splits: [[U.A, 500], [U.B, 500]] }), `'${id}'`)
-    await s.rpc(U.A, 'remove_member', [TRIP, U.B])
+    await removeMember(U.B)
     await s.as(U.A)
     await s.pg.exec(`update expenses set memo = '메모만 수정' where id = '${id}'`)                                   // 과거 기록의 다른 필드 수정
     await s.pg.exec(`update expenses set money = '${money({ shared: true, payer: U.B, local: 2000, splits: [[U.A, 1000], [U.B, 1000]] })}'::jsonb where id = '${id}'`) // 금액을 고쳐도 기존 참여자는 유지
@@ -139,7 +141,7 @@ describe('personal expenses are private to their author', () => {
     await insert(U.A, money({ shared: true, payer: U.A, splits: [[U.A, 1000]] }))
     expect(await rows(U.C)).toHaveLength(0)
     await expect(insert(U.C, money({ payer: null }))).rejects.toThrow(/row-level security/)
-    await s.rpc(U.A, 'remove_member', [TRIP, U.B])
+    await removeMember(U.B)
     expect(await rows(U.B)).toHaveLength(0)
   })
 })

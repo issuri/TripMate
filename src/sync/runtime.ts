@@ -3,13 +3,11 @@ import { useEffect, useState } from 'react'
 import { db } from '../db/local'
 import { createSyncManager, type SyncState } from './manager'
 import { createSupabase, createSupabaseRemote, watchTrip } from './remote'
-import { createSupabaseSharing, refreshMembers } from './sharing'
 import { discoverTrips, type RemoteAdapter } from './engine'
 
 /** Supabase 프로젝트가 설정되어 있는지(.env.local). 없으면 앱은 로컬 전용으로 동작한다. */
 export const supabase = createSupabase()
 export const syncConfigured = !!supabase
-export const sharing = supabase ? createSupabaseSharing(supabase) : null
 
 let remote: RemoteAdapter | null = null
 let userId: string | null = null
@@ -22,8 +20,6 @@ export const getRemote = () => remote
 
 export const syncManager = createSyncManager(() => remote, {
   discover: (r) => discoverTrips(r),
-  // 동기화할 때마다 동행자 목록 사본도 갱신(내 권한 변경·새 동행자·내보내짐 반영)
-  afterTrip: async (id) => { if (sharing) await refreshMembers(id, sharing) },
 })
 
 /**

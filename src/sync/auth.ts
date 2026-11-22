@@ -1,7 +1,6 @@
-// 로그인(Supabase Auth, 이메일 일회용 코드). 앱은 로그인 없이도 로컬 전용으로 쓸 수 있고, 공유·동기화에만 로그인이 필요하다.
+// 로그인(Supabase Auth, 이메일 일회용 코드). 앱은 로그인 없이도 로컬 전용으로 쓸 수 있고, 내 기기끼리 동기화에만 로그인이 필요하다.
 // 매직 링크 대신 "이메일로 받은 숫자 코드 입력" 방식을 쓴다: iPhone 홈 화면 앱에서는 메일의 링크가 Safari로 열려 앱에 로그인이 되지 않기 때문이다.
 import { useEffect, useState } from 'react'
-import { createSharingApi } from './sharing'
 import { setSignedInUser, supabase } from './runtime'
 
 export type AuthStatus = 'unconfigured' | 'loading' | 'signed_out' | 'signed_in'
@@ -47,17 +46,12 @@ export async function sendLoginCode(email: string) {
   if (error) throw new Error(friendly(error.message))
 }
 
-/** 이메일로 받은 코드로 로그인한다. 처음이면 표시 이름도 저장한다. */
-export async function verifyLoginCode(email: string, code: string, displayName?: string) {
+/** 이메일로 받은 코드로 로그인한다. */
+export async function verifyLoginCode(email: string, code: string) {
   const token = code.replace(/\s/g, '')
   if (!/^\d{6,8}$/.test(token)) throw new Error('이메일로 받은 숫자 코드를 입력하세요.')
-  const sb = need()
-  const { error } = await sb.auth.verifyOtp({ email: email.trim().toLowerCase(), token, type: 'email' })
+  const { error } = await need().auth.verifyOtp({ email: email.trim().toLowerCase(), token, type: 'email' })
   if (error) throw new Error(friendly(error.message))
-  if (displayName?.trim()) {
-    const rpc = async (fn: string, args: Record<string, unknown>) => { const { data, error: e } = await sb.rpc(fn, args); if (e) throw new Error(e.message); return data }
-    await createSharingApi(rpc as never, async () => []).setDisplayName(displayName.trim()).catch(() => undefined) // 이름 저장 실패는 로그인 자체를 막지 않는다
-  }
 }
 
 export async function signOut() { await supabase?.auth.signOut() }
