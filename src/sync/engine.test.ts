@@ -526,7 +526,7 @@ describe('convergence under random concurrent offline edits', () => {
       const { addPlace: addPlace_, deletePlace: deletePlace_ } = await import('../db/places')
       for (let step = 0; step < Number(process.env.SYNC_FUZZ_STEPS ?? 36); step++) {
         const d = pick(devs)
-        const op = pick(['add', 'edit', 'edit', 'complete', 'delete', 'move', 'chk', 'shop', 'sync', 'sync', 'toggleNet', 'place', 'link', 'trip'])
+        const op = pick(['add', 'edit', 'edit', 'complete', 'delete', 'move', 'chk', 'shop', 'sync', 'sync', 'toggleNet', 'place', 'link', 'trip', 'exp', 'exp'])
         const items = (await d.db.itineraryItems.where('tripId').equals(tid).filter((i) => !i.deletedAt).toArray())
         try {
           if (op === 'add' || items.length === 0) trace.push(`${d === devs[0] ? 'A' : 'B'} ADD`)
@@ -545,6 +545,17 @@ describe('convergence under random concurrent offline edits', () => {
             const ps = await d.db.places.where('tripId').equals(tid).filter((x) => !x.deletedAt).toArray()
             if (ps.length && items.length) await updateItem(pick(items).id, { placeId: pick(ps).id }, d.db)
             else if (ps.length) await addShopping(tid, { name: `연결${step}`, storePlaceId: pick(ps).id }, d.db)
+          } else if (op === 'exp' && d === devs[0]) {   // 개인 경비는 만든 사람만 볼 수 있으므로 기기 A만 만든다
+            const { addExpense, updateExpense, deleteExpense } = await import('../db/expenses')
+            const es = await d.db.expenses.where('tripId').equals(tid).filter((x) => !x.deletedAt).toArray()
+            const cats = await d.db.expenseCategories.where('tripId').equals(tid).filter((x) => !x.deletedAt).toArray()
+            const amt = 1000 + Math.floor(rnd() * 9000)
+            const money = { localMinor: amt, currency: 'KRW', rateMicro: 1_000_000, homeMinor: amt, shared: false, payer: 'self', splits: [] }
+            const r = rnd()
+            if (es.length && r < 0.3) await updateExpense(pick(es).id, { memo: `메모${step}` }, d.db)
+            else if (es.length && r < 0.5) { const x = pick(es); await updateExpense(x.id, { money: { ...x.money, localMinor: amt, homeMinor: amt } }, d.db) }
+            else if (es.length && r < 0.65) await deleteExpense(pick(es).id, d.db)
+            else if (cats.length) await addExpense(tid, { categoryId: pick(cats).id, paidAt: Date.now(), paymentMethod: '', itineraryItemId: null, shoppingItemId: null, memo: `e${step}`, money }, d.db)
           } else if (op === 'trip' && d === devs[0]) await updateTrip(tid, pick([{ city: `도시${step}` }, { purpose: `목적${step}` }, { companions: [`동행${step}`] }]), d.db)
           else if (op === 'sync') await syncTrip(tid, d.r.adapter, d.db)
           else if (op === 'toggleNet') d.r.state.down = !d.r.state.down
@@ -578,7 +589,14 @@ describe('convergence under random concurrent offline edits', () => {
       for (const def of ENTITIES) {
         const key = (r: Record<string, unknown>) => r.id as string
         // 삭제된 행은 화면에 보이지 않으므로 "삭제됨"만 비교한다(삭제 전 마지막 편집 내용이 기기마다 달라도 무해)
-        const norm = (r: Record<string, unknown>, deleted: boolean) => JSON.stringify(deleted ? { deleted } : { ...Object.fromEntries(def.fields.map((f) => [f.local, r[f.local] ?? null])), deleted })
+        const norm = (r: Record<string, unknown>, deleted: boolean) => {
+          const o: Record<string, unknown> = deleted ? { deleted } : { ...Object.fromEntries(def.fields.map((f) => [f.local, r[f.local] ?? null])), deleted }
+          if (def.table === 'expenses' && !deleted) {   // 기기에서는 본인을 'self', 서버에서는 사용자 id로 저장한다. 같은 사람으로 보고 키 순서도 맞춘다
+            const m = o.money as Record<string, unknown>
+            o.money = Object.fromEntries(Object.entries({ ...m, payer: m.payer === 'self' || m.payer === A ? 'ME' : m.payer }).sort(([x], [y]) => x.localeCompare(y)))
+          }
+          return JSON.stringify(o)
+        }
         const local = async (d: typeof devs[number]) => new Map((await (def.table === 'trips' ? d.db.trips.where('id').equals(tid).toArray() : (d.db[def.store as 'places'].where('tripId').equals(tid).toArray()))).map((r) => [key(r as never), norm(r as never, !!(r as { deletedAt: unknown }).deletedAt)]))
         const sv = (await pg.query<{ j: Record<string, unknown> }>(`select to_jsonb(t) as j from ${def.table} t where ${def.table === 'trips' ? 'id' : 'trip_id'} = $1::uuid`, [tid])).rows
         const server = new Map(sv.map((x) => [x.j.id as string, norm(fromRemoteRow(def, x.j), !!x.j.deleted_at)]))
@@ -586,6 +604,7 @@ describe('convergence under random concurrent offline edits', () => {
         // (서버에서 이미 삭제된 행은 내려받지 않았어도 된다: 사용자에게 보이지 않으므로)
         for (const [id, v] of server) for (const [label, m] of [['A', a], ['B', b]] as const) {
           if (m.get(id) === undefined && JSON.parse(v).deleted) continue
+          if (def.table === 'expenses' && label === 'B') { expect(m.has(id), '다른 사람의 개인 경비가 B 기기에 내려옴').toBe(false); continue }
           // 실패하면 이 레코드와 관련된 업로드·삭제 이력이 메시지에 함께 나온다
           expect(m.get(id), `${def.table} ${label} ${id}\n` + trace.filter((t) => t.includes(id.slice(0, 8))).slice(-30).join('\n')).toBe(v)
         }
