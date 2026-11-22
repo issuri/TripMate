@@ -17,6 +17,7 @@ export class TripMateDB extends Dexie {
   conflicts!: Table<SyncConflict, string>
   members!: Table<MemberRow, string>
   exclusions!: Table<{ tripId: string; at: number }, string>
+  remindersOff!: Table<{ tripId: string; at: number }, string>
 
   constructor(name = 'tripmate') {
     super(name)
@@ -39,6 +40,8 @@ export class TripMateDB extends Dexie {
     this.version(4).stores({ members: 'id, tripId, userId' })
     // v5: 이 기기에서 사본을 지운 여행(자동으로 다시 내려받지 않도록 기억)
     this.version(5).stores({ exclusions: 'tripId' })
+    // v6: 이 기기에서 알림을 끈 여행(알림은 기기마다 따로 설정한다. 서버에는 올리지 않는다)
+    this.version(6).stores({ remindersOff: 'tripId' })
   }
 }
 

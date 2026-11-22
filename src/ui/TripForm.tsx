@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { db } from '../db/local'
+import { setRemindersEnabled } from '../db/reminders'
 import { updateTrip } from '../db/itinerary'
 import { createTrip, deleteTrip, validateTrip } from '../db/trips'
 import { changedFields } from '../lib/diff'
@@ -31,6 +32,7 @@ function TripFormInner() {
   const [f, setF] = useState({ name: '', country: DEFAULT_COUNTRY, city: '', startDate: '', endDate: '', timeZone: FOREIGN_DEFAULT.timeZone, purpose: '', companions: '', localCurrency: FOREIGN_DEFAULT.localCurrency, coverImage: '' })
   const [abroad, setAbroad] = useState(true)   // 해외 여행(기본) / 국내 여행. 국내 여행은 한국 시간대와 원화로 정해진다
   const [editCountry, setEditCountry] = useState(false)
+  const [notify, setNotify] = useState(true)   // 새 여행의 알림(이 기기). 수정 화면에서는 여행 홈의 알림 카드에서 바꾼다
   const lastForeign = useRef<{ timeZone: string; localCurrency: string; country: string }>({ ...FOREIGN_DEFAULT, country: DEFAULT_COUNTRY })
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false) // 버튼 비활성화 표시용
@@ -112,7 +114,11 @@ function TripFormInner() {
     try {
       // 수정은 내가 바꾼 필드만 보낸다(폼을 여는 동안 동행자가 고친 다른 필드를 덮어쓰지 않도록)
       if (id) { await updateTrip(id, snapshot.current ? changedFields(snapshot.current, data) : data); nav(`/trips/${id}`) }
-      else { const t = await createTrip(data); nav(`/trips/${t.id}`) }
+      else {
+        const t = await createTrip(data)
+        if (!notify) await setRemindersEnabled(t.id, false)    // 알림을 받지 않기로 했다면 만들자마자 예약된 알림을 지운다
+        nav(`/trips/${t.id}`)
+      }
     } catch (e) { setErr((e as Error).message); submitting.current = false; setBusy(false) }
   }
 
@@ -164,6 +170,12 @@ function TripFormInner() {
         {!abroad && <p className="px-1 text-xs text-ink-3">국내 여행은 한국 시간과 원화로 설정돼요. 알림은 한국 시간 기준이에요.</p>}
         <Field label="여행 목적"><input className={input} value={f.purpose} onChange={set('purpose')} placeholder="관광, 휴양, 출장 등" /></Field>
         <Field label="동반자 (쉼표로 구분)"><input className={input} value={f.companions} onChange={set('companions')} placeholder="민수, 지은" /></Field>
+        {!id && (
+          <label className="flex items-center justify-between gap-3 rounded-2xl bg-paper px-4 py-3">
+            <span><span className="block text-sm font-semibold">일정 알림 받기</span><span className="block text-xs text-ink-2">끄면 이 여행은 알림 없이 만들어져요. 여행 홈에서 나중에 켤 수 있어요.</span></span>
+            <input type="checkbox" className="h-6 w-6 shrink-0 accent-signal" checked={notify} onChange={(e) => setNotify(e.target.checked)} aria-label="일정 알림 받기" />
+          </label>
+        )}
         <Field label="대표 이미지">
           <input type="file" accept="image/*" className="block w-full min-w-0 text-sm" onChange={(e) => onImage(e.target.files?.[0])} />
           {f.coverImage && <img src={f.coverImage} alt="" className="mt-2 h-32 w-full rounded-xl object-cover" />}

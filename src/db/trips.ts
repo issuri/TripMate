@@ -79,6 +79,7 @@ export async function deleteTrip(id: string, db: TripMateDB = defaultDb) {
     await db.outbox.add({ table: 'trips', recordId: id, op: 'delete', baseVersion: t.version, changedFields: ['deletedAt'], createdAt: now })
   })
   await cancelTripReminders(id, db) // 삭제한 여행의 알림 모두 취소
+  await db.remindersOff.delete(id)  // "알림 끔" 기록도 함께 정리
 }
 
 export const listTrips = (db: TripMateDB = defaultDb) =>

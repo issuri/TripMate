@@ -56,10 +56,11 @@ export function desiredForTrip(trip: Trip, now: number): Reminder[] {
  *  - 더 이상 필요 없는 알림(삭제·완료·비활성)은 취소
  */
 export async function reconcileTrip(tripId: string, db: TripMateDB = defaultDb, now = Date.now()) {
-  await db.transaction('rw', [db.trips, db.itineraryItems, db.reminders], async () => {
+  await db.transaction('rw', [db.trips, db.itineraryItems, db.reminders, db.remindersOff], async () => {
     const trip = await db.trips.get(tripId)
     const existing = await db.reminders.where('tripId').equals(tripId).toArray()
-    if (!trip || trip.deletedAt !== null) {
+    // 여행이 없거나, 이 기기에서 이 여행의 알림을 꺼 두었으면 예약된 알림을 모두 지운다
+    if (!trip || trip.deletedAt !== null || await db.remindersOff.get(tripId)) {
       if (existing.length) await db.reminders.bulkDelete(existing.map((r) => r.id))
       return
     }
@@ -96,6 +97,19 @@ export async function reconcileTrip(tripId: string, db: TripMateDB = defaultDb, 
  */
 export async function reconcileTripSafe(tripId: string, db: TripMateDB = defaultDb) {
   try { await reconcileTrip(tripId, db) } catch (e) { console.error('알림 예약 갱신 실패', e instanceof Error ? e.message : 'unknown') }
+}
+
+/** 이 기기에서 이 여행의 알림을 받는지(기본값: 받는다) */
+export const remindersEnabled = async (tripId: string, db: TripMateDB = defaultDb): Promise<boolean> => !(await db.remindersOff.get(tripId))
+
+/**
+ * 이 기기에서 여행 알림을 켜거나 끈다. 끄면 예약된 알림을 모두 지우고 새로 예약하지 않는다(일정마다의 알림 설정은 그대로 둔다).
+ * 켜면 일정에 맞춰 다시 예약한다. 알림은 기기마다 따로 설정한다.
+ */
+export async function setRemindersEnabled(tripId: string, enabled: boolean, db: TripMateDB = defaultDb) {
+  if (enabled) await db.remindersOff.delete(tripId)
+  else await db.remindersOff.put({ tripId, at: Date.now() })
+  await reconcileTripSafe(tripId, db)
 }
 
 export async function cancelTripReminders(tripId: string, db: TripMateDB = defaultDb) {

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { addItem, byOrder, deleteItem, moveItem, setCompleted, updateItem, type ItemInput } from '../db/itinerary'
 import { db } from '../db/local'
+import { remindersEnabled } from '../db/reminders'
 import type { ItemKind, ItineraryItem, Trip } from '../db/types'
 import { addDays, daysBetween } from '../lib/dates'
 import { changedFields } from '../lib/diff'
@@ -100,6 +101,7 @@ export default function DayPage() {
 }
 
 function ItemSheet({ trip, total, day, item, onClose, onAddExpense }: { trip: Trip; total: number; day: number; item: ItineraryItem | null; onClose: () => void; onAddExpense: (item: ItineraryItem) => void }) {
+  const tripOff = useLiveQuery(() => remindersEnabled(trip.id), [trip.id]) === false
   const [f, setF] = useState({
     title: item?.title ?? '', kind: (item?.kind ?? 'sight') as ItemKind, dayNumber: item?.dayNumber ?? day,
     startTime: item?.startTime ?? '', endTime: item?.endTime ?? '', locationText: item?.locationText ?? '', memo: item?.memo ?? '',
@@ -158,6 +160,7 @@ function ItemSheet({ trip, total, day, item, onClose, onAddExpense }: { trip: Tr
               {[[0, '시작 시각에'], [5, '5분 전'], [10, '10분 전'], [15, '15분 전'], [30, '30분 전'], [60, '1시간 전'], [120, '2시간 전'], [1440, '하루 전']].map(([m, l]) => <option key={m} value={m}>{l}</option>)}
             </select>
           </div>
+          {tripOff && <p className="mt-2 rounded-xl bg-paper p-2.5 text-xs text-ink-2">이 여행은 이 기기에서 알림이 꺼져 있어요. 여행 홈에서 켜면 이 설정대로 알려드려요.</p>}
           {f.reminderEnabled && !f.startTime && <p className="mt-2 text-xs text-ink-3">시작 시간을 입력하면 알림이 예약돼요.</p>}
           {f.reminderEnabled && f.travelMinutes !== '' && <p className="mt-2 text-xs text-ink-3">이동 시간이 입력되어 있어 출발할 시각에도 알려드려요.</p>}
         </div>
