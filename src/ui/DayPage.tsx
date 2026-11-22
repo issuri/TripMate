@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useRef, useState } from 'react'
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { addItem, byOrder, deleteItem, moveItem, setCompleted, updateItem, type ItemInput } from '../db/itinerary'
 import { db } from '../db/local'
 import type { ItemKind, ItineraryItem, Trip } from '../db/types'
@@ -19,6 +19,19 @@ export default function DayPage() {
   const [editing, setEditing] = useState<ItineraryItem | 'new' | null>(null)
   const places = useLiveQuery(() => db.places.where('tripId').equals(trip.id).filter((p) => !p.deletedAt).toArray(), [trip.id]) ?? []
   const placeName = (it: ItineraryItem) => places.find((p) => p.id === it.placeId)?.name ?? it.locationText
+
+  // 알림을 눌러 들어오면(?item=일정id) 해당 일정의 상세(편집) 시트를 바로 연다
+  const [sp, setSp] = useSearchParams()
+  const itemParam = sp.get('item')
+  useEffect(() => {
+    if (!itemParam) return
+    const target = items.find((i) => i.id === itemParam)
+    if (target) {
+      setEditing(target)
+      setSp((p) => { p.delete('item'); return p }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemParam, items.length])
 
   return (
     <div className="space-y-4">
@@ -56,6 +69,7 @@ export default function DayPage() {
                   <p className={`mt-0.5 text-[17px] font-bold leading-snug ${it.completed ? 'line-through' : ''}`}>{KIND_EMOJI[it.kind]} {it.title}</p>
                   {placeName(it) && <p className="mt-0.5 text-sm text-ink-2">{it.placeId ? '📍 ' : ''}{placeName(it)}</p>}
                   {it.memo && <p className="mt-1.5 text-sm text-ink-3">{it.memo}</p>}
+                  {it.reminderEnabled && it.startTime && !it.completed && <p className="num mt-1.5 text-xs text-ink-3">🔔 {it.reminderMinutesBefore ? `${it.reminderMinutesBefore >= 60 ? `${it.reminderMinutesBefore / 60}시간` : `${it.reminderMinutesBefore}분`} 전` : '시작 시각'}</p>}
                 </button>
                 <div className="flex flex-col items-center gap-1">
                   <input type="checkbox" className="check" checked={it.completed} onChange={(e) => setCompleted(it.id, e.target.checked)} aria-label="완료" />
@@ -117,6 +131,19 @@ function ItemSheet({ trip, total, day, item, onClose }: { trip: Trip; total: num
           <Field label="이동 수단"><select className={input} value={f.travelMode} onChange={s('travelMode')}><option value="">-</option>{Object.entries(MODE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
         </div>
         <Field label="메모"><textarea className={input} rows={3} value={f.memo} onChange={s('memo')} /></Field>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-line">
+          <label className="flex items-center justify-between gap-3">
+            <span className="font-semibold">🔔 일정 알림</span>
+            <input type="checkbox" className="h-6 w-6 accent-signal" checked={f.reminderEnabled} onChange={(e) => setF({ ...f, reminderEnabled: e.target.checked })} aria-label="일정 알림 사용" />
+          </label>
+          <div className="mt-3 flex items-center gap-2">
+            <select className={input} disabled={!f.reminderEnabled} value={f.reminderMinutesBefore} aria-label="알림 시간" onChange={(e) => setF({ ...f, reminderMinutesBefore: Number(e.target.value) })}>
+              {[[0, '시작 시각에'], [5, '5분 전'], [10, '10분 전'], [15, '15분 전'], [30, '30분 전'], [60, '1시간 전'], [120, '2시간 전'], [1440, '하루 전']].map(([m, l]) => <option key={m} value={m}>{l}</option>)}
+            </select>
+          </div>
+          {f.reminderEnabled && !f.startTime && <p className="mt-2 text-xs text-ink-3">시작 시간을 입력하면 알림이 예약돼요.</p>}
+          {f.reminderEnabled && f.travelMinutes !== '' && <p className="mt-2 text-xs text-ink-3">이동 시간이 입력되어 있어 출발할 시각에도 알려드려요.</p>}
+        </div>
         {err && <p className="rounded-2xl bg-danger/10 p-3 text-sm text-danger" role="alert">{err}</p>}
         <div className="flex gap-2">
           {item && <button className={`${btnGhost} text-danger`} onClick={async () => { if (confirm('이 일정을 삭제할까요?')) { await deleteItem(item.id); onClose() } }}>삭제</button>}

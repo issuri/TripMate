@@ -9,6 +9,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest', // 알림 클릭/푸시 처리를 위해 직접 만든 서비스워커(src/sw.ts) 사용
+      srcDir: 'src',
+      filename: 'sw.ts',
       manifest: {
         name: 'TripMate 여행 가이드',
         short_name: 'TripMate',
@@ -24,7 +27,7 @@ export default defineConfig({
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
         ],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'] },
+      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'] },
     }),
   ],
   test: { environment: 'node', include: ['src/**/*.test.ts'] },

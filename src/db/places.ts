@@ -12,13 +12,18 @@ export interface PlaceInput {
   category?: string
 }
 
-export const validCoord = (lat: number | null | undefined, lng: number | null | undefined) =>
-  lat == null || lng == null || (Math.abs(lat) <= 90 && Math.abs(lng) <= 180)
+/** 위도·경도는 둘 다 있거나 둘 다 없어야 하고, 유한한 숫자이며 범위 안이어야 한다. */
+export const validCoord = (lat: number | null | undefined, lng: number | null | undefined) => {
+  if (lat == null && lng == null) return true
+  if (lat == null || lng == null) return false
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+}
 
 /** 같은 외부 장소(또는 같은 이름+좌표)는 새로 만들지 않고 기존 장소를 돌려준다(중복 저장 방지). */
 export async function addPlace(tripId: string, input: PlaceInput, db: TripMateDB = defaultDb): Promise<Place> {
   if (!input.name.trim()) throw new Error('장소 이름을 입력하세요.')
-  if (!validCoord(input.lat, input.lng)) throw new Error('좌표 범위가 올바르지 않습니다.')
+  if (input.name.length > 200 || (input.address?.length ?? 0) > 500) throw new Error('입력한 글자 수가 너무 많습니다.')
+  if (!validCoord(input.lat, input.lng)) throw new Error('위도와 경도를 함께, 올바른 범위로 입력하세요.')
   const existing = await db.places.where('tripId').equals(tripId).filter((p) => p.deletedAt === null).toArray()
   const dup = existing.find((p) =>
     (input.externalId && p.externalId === input.externalId) ||

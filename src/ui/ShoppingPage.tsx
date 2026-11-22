@@ -19,6 +19,7 @@ export default function ShoppingPage() {
   const [editing, setEditing] = useState<ShoppingItem | 'new' | null>(null)
   const [paying, setPaying] = useState<ShoppingItem | null>(null)
   const [budgetEdit, setBudgetEdit] = useState<string | null>(null)
+  const [budgetErr, setBudgetErr] = useState<string | null>(null)
 
   const sum = summarizeShopping(items, trip.shoppingBudgetMinor)
   const pct = sum.budgetMinor ? Math.min(100, Math.round((sum.actualMinor / sum.budgetMinor) * 100)) : 0
@@ -31,9 +32,10 @@ export default function ShoppingPage() {
   const order = [...groups.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : (placeOf(a)?.name ?? '').localeCompare(placeOf(b)?.name ?? '')))
 
   const saveBudget = async () => {
-    const v = parseMajor(budgetEdit ?? '', cur)
-    if (v !== null) await updateTrip(trip.id, { shoppingBudgetMinor: v })
-    setBudgetEdit(null)
+    const raw = (budgetEdit ?? '').trim()
+    const v = raw === '' ? 0 : parseMajor(raw, cur) // 비우면 예산 해제
+    if (v === null) { setBudgetErr('금액을 숫자로 입력하세요. 예: 50000 또는 50,000'); return } // 조용히 닫히면 저장된 것으로 오해한다
+    try { await updateTrip(trip.id, { shoppingBudgetMinor: v }); setBudgetErr(null); setBudgetEdit(null) } catch (e) { setBudgetErr((e as Error).message) }
   }
 
   return (
@@ -46,6 +48,7 @@ export default function ShoppingPage() {
               ? <button className="num text-left text-2xl font-extrabold" onClick={() => setBudgetEdit(trip.shoppingBudgetMinor ? formatMinor(trip.shoppingBudgetMinor, cur).replace(/,/g, '') : '')}>{sum.budgetMinor ? f(sum.budgetMinor) : '예산 설정'}</button>
               : <div className="mt-1 flex gap-2"><input autoFocus inputMode="decimal" className={input} value={budgetEdit} onChange={(e) => setBudgetEdit(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveBudget()} /><button className={btnPrimary} onClick={saveBudget}>저장</button></div>}
           </div>
+          {budgetErr && <p className="mt-1 text-xs text-danger" role="alert">{budgetErr}</p>}
           {sum.overBudget && <span className="rounded-full bg-danger/10 px-3 py-1 text-xs font-bold text-danger">예산 초과 예상</span>}
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-line"><div className={`h-full rounded-full ${sum.overBudget ? 'bg-danger' : 'bg-mint'}`} style={{ width: `${pct}%` }} /></div>

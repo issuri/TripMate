@@ -5,6 +5,7 @@ import type { Trip } from '../db/types'
 import { addDays, computeStatus, daysBetween, todayIn } from '../lib/dates'
 import { computeGuide, nextItem } from '../lib/guide'
 import { Card, KIND_EMOJI, KIND_LABEL } from './kit'
+import NotificationCard from './NotificationCard'
 
 export default function TripHome() {
   const trip = useOutletContext<Trip>()
@@ -58,6 +59,8 @@ export default function TripHome() {
           {trip.purpose && <span className="text-sm text-ink-2">{trip.purpose}</span>}
         </div>
       )}
+
+      <NotificationCard trip={trip} />
 
       <Card>
         <h2 className="mb-3 text-base font-bold">여행 가이드</h2>

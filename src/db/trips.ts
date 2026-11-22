@@ -1,6 +1,8 @@
 import { v4 as uuid } from 'uuid'
 import { computeStatus, daysBetween, isValidDate } from '../lib/dates'
+import { isValidTimeZone } from '../lib/tz'
 import { db as defaultDb, type TripMateDB } from './local'
+import { cancelTripReminders, reconcileTripSafe } from './reminders'
 import type { Trip } from './types'
 
 export const DEFAULT_CATEGORIES = ['항공 및 교통', '숙박', '식비', '관광 및 입장료', '쇼핑', '기타']
@@ -23,9 +25,11 @@ export interface NewTripInput {
 
 export function validateTrip(i: NewTripInput): string | null {
   if (!i.name.trim()) return '여행 이름을 입력하세요.'
+  if (i.name.length > 200 || (i.country?.length ?? 0) > 100 || (i.city?.length ?? 0) > 100) return '입력한 글자 수가 너무 많습니다.'
   if (!isValidDate(i.startDate) || !isValidDate(i.endDate)) return '날짜 형식이 올바르지 않습니다.'
   if (i.endDate < i.startDate) return '종료일은 시작일 이후여야 합니다.'
   if (daysBetween(i.startDate, i.endDate) > 120) return '여행 기간은 최대 120일까지 지원합니다.'
+  if (i.timeZone && !isValidTimeZone(i.timeZone)) return '시간대가 올바르지 않습니다.'
   return null
 }
 
@@ -57,6 +61,7 @@ export async function createTrip(input: NewTripInput, db: TripMateDB = defaultDb
     })))
     await db.outbox.add({ table: 'trips', recordId: trip.id, op: 'upsert', baseVersion: 0, changedFields: ['*'], createdAt: now })
   })
+  await reconcileTripSafe(trip.id, db) // 출발 전날 알림 예약
   return trip
 }
 
@@ -69,6 +74,7 @@ export async function deleteTrip(id: string, db: TripMateDB = defaultDb) {
     await db.trips.update(id, { deletedAt: now, updatedAt: now, syncState: 'pending' })
     await db.outbox.add({ table: 'trips', recordId: id, op: 'delete', baseVersion: t.version, changedFields: ['deletedAt'], createdAt: now })
   })
+  await cancelTripReminders(id, db) // 삭제한 여행의 알림 모두 취소
 }
 
 export const listTrips = (db: TripMateDB = defaultDb) =>

@@ -9,7 +9,13 @@ export const minorDigits = (currency: string): number => MINOR_DIGITS[currency] 
 
 /** "12.34" → 1234 (USD). 소수 자릿수 초과/잘못된 입력은 null. 문자열 기반이라 부동소수점 오차 없음. */
 export function parseMajor(input: string, currency: string): number | null {
-  const s = input.trim().replace(/,/g, '')
+  let s = input.trim()
+  // 쉼표는 올바른 천 단위 구분(1,234 / 1,234,567.89)일 때만 허용한다.
+  // "1,50"처럼 쉼표를 소수점으로 쓴 입력을 쉼표 제거로 읽으면 150이 되어 금액이 100배가 되므로 거부한다.
+  if (s.includes(',')) {
+    if (!/^\d{1,3}(,\d{3})+(\.\d*)?$/.test(s)) return null
+    s = s.replace(/,/g, '')
+  }
   const digits = minorDigits(currency)
   const m = /^(\d+)(?:\.(\d*))?$/.exec(s)
   if (!m) return null
@@ -50,6 +56,8 @@ export function convertToHome(localMinor: number, localCurrency: string, rateMic
 
 /** total을 weights 비율로 정수 분배. 합계가 항상 total과 정확히 일치(나머지는 앞사람부터 1씩). */
 export function splitByWeights(total: number, weights: number[]): number[] {
+  if (!Number.isSafeInteger(total) || total < 0) throw new Error('total must be a non-negative integer')
+  if (weights.some((w) => !Number.isSafeInteger(w) || w < 0)) throw new Error('weights must be non-negative integers')
   const sum = weights.reduce((a, b) => a + b, 0)
   if (weights.length === 0 || sum <= 0) throw new Error('weights must be positive')
   const out = weights.map((w) => Math.floor((total * w) / sum))

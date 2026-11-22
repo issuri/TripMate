@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ChecklistPage from './ui/ChecklistPage'
 import DayPage from './ui/DayPage'
 import MapPage from './ui/MapPage'
+import ReminderHost from './ui/ReminderHost'
 import ShoppingPage from './ui/ShoppingPage'
 import TripForm from './ui/TripForm'
 import TripHome from './ui/TripHome'
@@ -11,6 +12,7 @@ import TripList from './ui/TripList'
 export default function App() {
   return (
     <BrowserRouter>
+      <ReminderHost />
       <Routes>
         <Route path="/" element={<TripList />} />
         <Route path="/trips/new" element={<TripForm />} />

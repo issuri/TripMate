@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, OutboxEntry, Place, ShoppingItem, Trip,
+  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, OutboxEntry, Place, Reminder, ShoppingItem, Trip,
 } from './types'
 
 export class TripMateDB extends Dexie {
@@ -12,6 +12,7 @@ export class TripMateDB extends Dexie {
   expenseCategories!: Table<ExpenseCategory, string>
   expenses!: Table<Expense, string>
   outbox!: Table<OutboxEntry, number>
+  reminders!: Table<Reminder, string>
 
   constructor(name = 'tripmate') {
     super(name)
@@ -26,6 +27,8 @@ export class TripMateDB extends Dexie {
       expenses: 'id, tripId, paidAt, syncState',
       outbox: '++seq, table, recordId',
     })
+    // v2: 기기 로컬 알림 예약 테이블 추가 (기존 데이터는 그대로 유지)
+    this.version(2).stores({ reminders: 'id, tripId, itemId, fireAt, state' })
   }
 }
 

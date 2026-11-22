@@ -5,7 +5,9 @@ const toUtc = (d: string) => {
   return Date.UTC(y, m - 1, day)
 }
 
-export const isValidDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(toUtc(d))
+// 2026-02-30 같은 존재하지 않는 날짜가 다음 달로 넘어가 통과하지 않도록, 변환 후 다시 같은 문자열이 되는지 확인한다.
+export const isValidDate = (d: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(toUtc(d)) && new Date(toUtc(d)).toISOString().slice(0, 10) === d
 
 export function daysBetween(start: string, end: string): number {
   return Math.round((toUtc(end) - toUtc(start)) / 86400000) + 1

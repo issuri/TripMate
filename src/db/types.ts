@@ -96,6 +96,26 @@ export interface Expense extends SyncMeta {
   memo: string
 }
 
+export type ReminderKind = 'start' | 'leave' | 'trip_eve'
+export type ReminderState = 'pending' | 'fired' | 'missed'
+
+/**
+ * 기기 로컬 알림 예약. 일정에서 파생되는 값이라 서버로 동기화하지 않는다(기기별 상태).
+ * id가 결정적이라(`일정id:종류`) 같은 알림이 두 번 만들어지지 않는다.
+ */
+export interface Reminder {
+  id: string
+  tripId: string
+  itemId: string | null
+  kind: ReminderKind
+  fireAt: number          // UTC ms (여행지 현지 시간대 기준으로 계산됨)
+  title: string
+  body: string
+  url: string             // 알림 클릭 시 이동할 앱 내 경로
+  state: ReminderState
+  firedAt: number | null
+}
+
 /** 오프라인 변경 큐. 서버 전송은 id 기반 upsert라 재전송해도 중복되지 않는다. */
 export interface OutboxEntry {
   seq?: number

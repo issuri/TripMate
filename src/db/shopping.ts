@@ -15,6 +15,8 @@ export interface ShoppingInput {
 
 function check(i: Partial<ShoppingInput>) {
   if (i.name !== undefined && !i.name.trim()) throw new Error('상품명을 입력하세요.')
+  if ((i.name?.length ?? 0) > 200 || (i.memo?.length ?? 0) > 1000) throw new Error('입력한 글자 수가 너무 많습니다.')
+  if (i.quantity !== undefined && i.quantity > 9999) throw new Error('수량이 너무 큽니다.')
   if (i.quantity !== undefined && (!Number.isInteger(i.quantity) || i.quantity < 1)) throw new Error('수량은 1 이상이어야 합니다.')
   if (i.expectedPriceMinor !== undefined && (!Number.isInteger(i.expectedPriceMinor) || i.expectedPriceMinor < 0)) throw new Error('가격이 올바르지 않습니다.')
 }
