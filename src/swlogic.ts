@@ -3,8 +3,14 @@
 interface ClientLike { url: string; focus(): Promise<unknown>; postMessage(m: unknown): void }
 interface ClientsLike { matchAll(o: { type: 'window'; includeUncontrolled: boolean }): Promise<ClientLike[]>; openWindow(url: string): Promise<unknown> }
 
-/** 같은 출처의 앱 창이 있으면 그 창을 앞으로 가져와 해당 일정으로 이동시키고, 없으면 새 창으로 연다. 외부 주소는 열지 않는다. */
-export async function routeNotificationClick(clients: ClientsLike, origin: string, rawUrl: unknown): Promise<'focused' | 'opened'> {
+/** 앱이 도메인 맨 앞이 아닌 하위 경로(예: /TripMate/)에서 서비스될 때, 앱 안의 주소('/trips/1')를 실제 주소로 바꾼다. base 는 '/' 또는 '/TripMate/' 꼴. */
+export const withBase = (base: string, path: string): string => base.replace(/\/+$/, '') + path
+
+/**
+ * 같은 출처의 앱 창이 있으면 그 창을 앞으로 가져와 해당 일정으로 이동시키고, 없으면 새 창으로 연다. 외부 주소는 열지 않는다.
+ * rawUrl 은 앱 안의 주소('/trips/…')이고, 새 창으로 열 때만 base 를 붙인다(열려 있는 창에는 앱의 라우터가 알아서 이동한다).
+ */
+export async function routeNotificationClick(clients: ClientsLike, origin: string, rawUrl: unknown, base = '/'): Promise<'focused' | 'opened'> {
   const url = typeof rawUrl === 'string' && rawUrl.startsWith('/') && !rawUrl.startsWith('//') ? rawUrl : '/'
   const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true })
   for (const w of wins) {
@@ -14,7 +20,7 @@ export async function routeNotificationClick(clients: ClientsLike, origin: strin
       return 'focused'
     }
   }
-  await clients.openWindow(url)
+  await clients.openWindow(withBase(base, url))
   return 'opened'
 }
 

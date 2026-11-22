@@ -22,7 +22,7 @@ export async function requestPermission(): Promise<PermissionState> {
 /** 시스템 알림 표시. tag=알림 id 라서 같은 알림이 중복 표시되지 않고 교체된다. */
 export async function showReminder(r: Pick<Reminder, 'id' | 'title' | 'body' | 'url'>): Promise<boolean> {
   if (permissionState() !== 'granted') return false
-  const opts: NotificationOptions = { body: r.body, tag: r.id, icon: '/icon.svg', badge: '/icon.svg', data: { url: r.url } }
+  const opts: NotificationOptions = { body: r.body, tag: r.id, icon: `${import.meta.env.BASE_URL}icon.svg`, badge: `${import.meta.env.BASE_URL}icon.svg`, data: { url: r.url } }
   try {
     const reg = await navigator.serviceWorker?.getRegistration()
     if (reg) { await reg.showNotification(r.title, opts); return true }

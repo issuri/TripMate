@@ -25,6 +25,8 @@ jobs:
       - run: npm ci
       - run: npm test          # 테스트가 실패하면 게시하지 않는다
       - run: npm run build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/       # 주소가 https://아이디.github.io/저장소이름/ 이므로
       # GitHub Pages 는 없는 주소에 404.html 을 보여준다. 앱 화면으로 쓰면 주소를 직접 열거나 새로고침해도 동작한다.
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3

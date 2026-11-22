@@ -21,7 +21,7 @@ function TripHomeRedirect() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>{/* 하위 경로(예: /TripMate/)에서 서비스될 때를 위해 */}
       <ReminderHost />
       <SyncHost />
       <ConfirmHost />

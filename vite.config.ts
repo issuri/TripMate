@@ -30,7 +30,11 @@ function csp(supabaseUrl?: string): Plugin {
   }
 }
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+// 앱이 서비스되는 경로. 기본은 도메인 맨 앞('/'). GitHub Pages 의 저장소 주소(…github.io/저장소이름/)에서는 배포할 때 VITE_BASE=/저장소이름/ 으로 지정한다.
+const base = loadEnv(mode, process.cwd(), 'VITE_').VITE_BASE || '/'
+return {
+  base,
   plugins: [
     csp(loadEnv(mode, process.cwd(), 'VITE_').VITE_SUPABASE_URL),
     react(),
@@ -46,7 +50,8 @@ export default defineConfig(({ mode }) => ({
         description: '여행 준비부터 귀국까지 올인원 여행 관리',
         lang: 'ko',
         display: 'standalone',
-        start_url: '/',
+        start_url: base,   // 시작 주소와 범위는 앱이 서비스되는 경로와 같아야 한다(범위 밖이면 홈 화면 앱이 열리지 않는다)
+        scope: base,
         theme_color: '#ffc4da',
         background_color: '#f8f4f7',
         icons: [
@@ -60,4 +65,5 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
-}))
+}
+})

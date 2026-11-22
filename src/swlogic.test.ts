@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parsePush, routeNotificationClick } from './swlogic'
+import { parsePush, routeNotificationClick, withBase } from './swlogic'
 
 const mkClients = (wins: { url: string }[]) => {
   const focus = vi.fn(async () => {}), postMessage = vi.fn()
@@ -26,6 +26,31 @@ describe('notification click routing', () => {
       await routeNotificationClick(m.clients, 'https://app.test', bad)
       expect(m.openWindow).toHaveBeenCalledWith('/')
     }
+  })
+})
+
+describe('when the app is served from a sub-path such as /TripMate/', () => {
+  it('adds the base only when opening a new window; an open window navigates with the in-app address', async () => {
+    const closed = mkClients([])
+    await routeNotificationClick(closed.clients, 'https://u.github.io', '/trips/1/day/2?item=abc', '/TripMate/')
+    expect(closed.openWindow).toHaveBeenCalledWith('/TripMate/trips/1/day/2?item=abc')
+    const open = mkClients([{ url: 'https://u.github.io/TripMate/trips/1' }])
+    await routeNotificationClick(open.clients, 'https://u.github.io', '/trips/1/day/2', '/TripMate/')
+    expect(open.postMessage).toHaveBeenCalledWith({ type: 'navigate', url: '/trips/1/day/2' })   // 라우터가 base 를 알고 있다
+    expect(open.openWindow).not.toHaveBeenCalled()
+  })
+  it('falls back to the app home inside the base for bad addresses', async () => {
+    for (const bad of ['https://evil.example/', '//evil.example', undefined]) {
+      const m = mkClients([])
+      await routeNotificationClick(m.clients, 'https://u.github.io', bad, '/TripMate/')
+      expect(m.openWindow).toHaveBeenCalledWith('/TripMate/')
+    }
+  })
+  it('withBase handles a root base, a sub-path base and a missing trailing slash', () => {
+    expect(withBase('/', '/trips/1')).toBe('/trips/1')
+    expect(withBase('/TripMate/', '/trips/1')).toBe('/TripMate/trips/1')
+    expect(withBase('/TripMate', '/trips/1')).toBe('/TripMate/trips/1')
+    expect(withBase('/a/b/', '/')).toBe('/a/b/')
   })
 })
 
