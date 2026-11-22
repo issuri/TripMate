@@ -12,7 +12,7 @@ type Listener = (s: SyncState) => void
  * remote 가 null 이면(서버 미설정 또는 로그아웃) 동기화하지 않고 로컬 전용으로 동작한다.
  * 동기화 요청은 db 쪽에서 한 줄로 직렬화되므로 여기서 여러 번 불러도 중복 전송되지 않는다.
  */
-export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: { intervalMs?: number; debounceMs?: number } = {}) {
+export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: { intervalMs?: number; debounceMs?: number; afterTrip?: (tripId: string) => Promise<unknown>; discover?: (remote: RemoteAdapter) => Promise<unknown> } = {}) {
   let state: SyncState = { status: 'idle', lastReport: null }
   const listeners = new Set<Listener>()
   const set = (s: Partial<SyncState>) => { state = { ...state, ...s }; listeners.forEach((l) => l(state)) }
@@ -27,8 +27,10 @@ export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: {
   async function syncAllOnce(): Promise<void> {
     const remote = getRemote()
     if (!remote) return set({ status: 'unconfigured' })
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return set({ status: 'offline' })
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return set({ status: 'offline' })
     set({ status: 'syncing' })
+    // 초대받았거나 다른 기기에서 만든 여행이 서버에 있으면 먼저 내려받는다(실패해도 이미 있는 여행의 동기화는 계속)
+    await opts.discover?.(remote).catch(() => undefined)
     // 삭제한 여행은 삭제가 서버에 전달될 때까지만(보낼 변경이 남아 있을 때만) 동기화한다
     const trips = await db.trips.toArray()
     const ids: string[] = []
@@ -38,6 +40,7 @@ export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: {
     for (const id of ids) {
       last = await syncTrip(id, remote, db)
       if (last.error && /네트워크/.test(last.error)) { net = true; break }
+      await opts.afterTrip?.(id).catch(() => undefined) // 예: 동행자 목록 새로고침(실패해도 동기화 결과에는 영향 없음)
     }
     set({ status: net ? 'offline' : last?.error ? 'error' : 'idle', lastReport: last })
   }
@@ -55,5 +58,5 @@ export function createSyncManager(getRemote: () => RemoteAdapter | null, opts: {
     return () => { removeEventListener('online', onOnline); removeEventListener('offline', onOffline); clearInterval(iv); sub.unsubscribe(); if (timer) clearTimeout(timer) }
   }
 
-  return { start, syncAll, getState: () => state, subscribe: (l: Listener) => { listeners.add(l); return () => { listeners.delete(l) } }, pendingCount }
+  return { start, syncAll, requestSync: (ms = 300) => schedule(ms), getState: () => state, subscribe: (l: Listener) => { listeners.add(l); return () => { listeners.delete(l) } }, pendingCount }
 }

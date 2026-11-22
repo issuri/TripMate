@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, OutboxEntry, Place, Reminder, ShoppingItem, SyncConflict, SyncMeta2, Trip,
+  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, MemberRow, OutboxEntry, Place, Reminder, ShoppingItem, SyncConflict, SyncMeta2, Trip,
 } from './types'
 
 export class TripMateDB extends Dexie {
@@ -15,6 +15,8 @@ export class TripMateDB extends Dexie {
   reminders!: Table<Reminder, string>
   syncMeta!: Table<SyncMeta2, string>
   conflicts!: Table<SyncConflict, string>
+  members!: Table<MemberRow, string>
+  exclusions!: Table<{ tripId: string; at: number }, string>
 
   constructor(name = 'tripmate') {
     super(name)
@@ -33,6 +35,10 @@ export class TripMateDB extends Dexie {
     this.version(2).stores({ reminders: 'id, tripId, itemId, fireAt, state' })
     // v3: 동기화 상태(여행별)와 충돌 보관 테이블
     this.version(3).stores({ syncMeta: 'tripId', conflicts: 'id, tripId, recordId' })
+    // v4: 여행 멤버 목록 사본
+    this.version(4).stores({ members: 'id, tripId, userId' })
+    // v5: 이 기기에서 사본을 지운 여행(자동으로 다시 내려받지 않도록 기억)
+    this.version(5).stores({ exclusions: 'tripId' })
   }
 }
 

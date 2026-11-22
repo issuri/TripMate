@@ -12,6 +12,7 @@ export default function TripHome() {
   const trip = useOutletContext<Trip>()
   const items = useLiveQuery(() => db.itineraryItems.where('tripId').equals(trip.id).filter((i) => !i.deletedAt).toArray(), [trip.id]) ?? []
   const checklist = useLiveQuery(() => db.checklistItems.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []
+  const activeMembers = (useLiveQuery(() => db.members.where('tripId').equals(trip.id).toArray(), [trip.id]) ?? []).filter((m) => m.status === 'active')
   const total = daysBetween(trip.startDate, trip.endDate)
   const status = computeStatus(trip.startDate, trip.endDate, trip.timeZone)
   const today = todayIn(trip.timeZone)
@@ -54,9 +55,12 @@ export default function TripHome() {
         </div>
       </section>
 
-      {trip.companions.length > 0 && (
+      {(activeMembers.length > 1 || trip.companions.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 px-1">
-          {trip.companions.map((c) => <span key={c} className="rounded-full bg-white px-3 py-1.5 text-sm font-medium ring-1 ring-line">{c}</span>)}
+          {activeMembers.length > 1
+            ? activeMembers.map((m) => <span key={m.id} className="rounded-full bg-white px-3 py-1.5 text-sm font-medium ring-1 ring-line">{m.displayName || '(이름 없음)'}{m.role === 'admin' ? ' · 관리자' : ''}</span>)
+            : trip.companions.map((c) => <span key={c} className="rounded-full bg-white px-3 py-1.5 text-sm font-medium ring-1 ring-line">{c}</span>)}
+          <Link to={`/trips/${trip.id}/share`} className="rounded-full px-2 py-1.5 text-sm font-semibold text-signal">공유 관리</Link>
           {trip.purpose && <span className="text-sm text-ink-2">{trip.purpose}</span>}
         </div>
       )}

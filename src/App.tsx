@@ -2,7 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ChecklistPage from './ui/ChecklistPage'
 import DayPage from './ui/DayPage'
 import MapPage from './ui/MapPage'
+import JoinPage from './ui/JoinPage'
+import LoginPage from './ui/LoginPage'
 import OfflinePage from './ui/OfflinePage'
+import SharePage from './ui/SharePage'
 import ReminderHost from './ui/ReminderHost'
 import SyncHost from './ui/SyncHost'
 import ShoppingPage from './ui/ShoppingPage'
@@ -18,6 +21,8 @@ export default function App() {
       <SyncHost />
       <Routes>
         <Route path="/" element={<TripList />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/join" element={<JoinPage />} />
         <Route path="/trips/new" element={<TripForm />} />
         <Route path="/trips/:id/edit" element={<TripForm />} />
         <Route path="/trips/:id" element={<TripLayout />}>
@@ -27,6 +32,7 @@ export default function App() {
           <Route path="shopping" element={<ShoppingPage />} />
           <Route path="checklist" element={<ChecklistPage />} />
           <Route path="offline" element={<OfflinePage />} />
+          <Route path="share" element={<SharePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

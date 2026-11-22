@@ -65,9 +65,11 @@ describe('SQL migrations', () => {
   })
 
   it('members can edit; only admins manage members; version increments on update', async () => {
+    // 멤버 추가는 초대 코드(RPC)로만 가능하다 (직접 INSERT는 막혀 있다: sharing.sql.test.ts 참고)
     await as(A)
-    await pg.exec(`insert into trip_members (trip_id, user_id, role) values ('${TRIP}', '${B}', 'member')`)
+    const code = (await pg.query<{ c: string }>(`select public.create_invite('${TRIP}'::uuid, 24, 5) as c`)).rows[0].c
     await as(B)
+    await pg.query(`select public.join_trip($1)`, [code])
     expect((await pg.query(`select id from trips`)).rows).toHaveLength(1)
     await pg.exec(`update itinerary_items set completed = true where trip_id='${TRIP}'`)
     const v = await pg.query<{ version: number; completed: boolean }>(`select version, completed from itinerary_items where trip_id='${TRIP}'`)
