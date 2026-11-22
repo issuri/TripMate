@@ -4,7 +4,7 @@
 import { reconcileTripSafe } from '../db/reminders'
 import { db as defaultDb, type TripMateDB } from '../db/local'
 import type { OutboxEntry, SyncMeta2 } from '../db/types'
-import { ENTITIES, entityByStore, entityByTable, fromRemoteRow, fromRemoteValue, toRemoteFields, type EntityDef, type RemoteRow } from './schema'
+import { ENTITIES, entityByStore, entityByTable, fromRemoteRow, fromRemoteValue, toRemoteFields, type Ctx, type EntityDef, type RemoteRow } from './schema'
 
 export interface PushRequest { table: string; id: string; op: 'upsert' | 'delete'; baseVersion: number; fields: Record<string, unknown>; clientId: string }
 export interface PushResult { status: 'ok' | 'conflict'; version: number; reason?: 'deleted'; note?: 'not_found'; conflicts?: { field: string; remote: unknown; local: unknown }[] }
@@ -99,7 +99,7 @@ async function pushTrip(db: TripMateDB, remote: RemoteAdapter, tripId: string, r
     // 서버가 그런 행을 모르면 note:'not_found' 로 무해하게 끝난다.
     let fields: Record<string, unknown> = {}
     if (!isDelete) {
-      fields = toRemoteFields(def, rec, changed)
+      fields = toRemoteFields(def, rec, changed, { userId: remote.userId() })
       if (baseVersion === 0 || all_) {
         if (def.hasTripId) fields.trip_id = tripId
         if (def.table === 'trips') fields.owner_id = remote.userId()
@@ -140,7 +140,7 @@ async function pushTrip(db: TripMateDB, remote: RemoteAdapter, tripId: string, r
           if (!fd) continue
           await db.conflicts.put({
             id: `${def.table}:${recordId}:${fd.local}`, tripId, table: def.table, recordId, field: fd.local, kind: 'field',
-            localValue: cur[fd.local], remoteValue: fromRemoteValue(fd.kind, c.remote), serverVersion: res.version,
+            localValue: cur[fd.local], remoteValue: fromRemoteValue(fd.kind, c.remote, { userId: remote.userId() }), serverVersion: res.version,
             title: String(cur.name ?? cur.title ?? ''), createdAt: Date.now(),
           })
           report.conflicts++
@@ -160,7 +160,7 @@ async function pushTrip(db: TripMateDB, remote: RemoteAdapter, tripId: string, r
 }
 
 // ───────────────────────── pull ─────────────────────────
-async function applyRemoteRow(db: TripMateDB, def: EntityDef, row: RemoteRow, tripId: string, report: SyncReport) {
+async function applyRemoteRow(db: TripMateDB, def: EntityDef, row: RemoteRow, tripId: string, report: SyncReport, ctx: Ctx) {
   const id = String(row.id)
   const remoteVersion = Number(row.version)
   const remoteDeletedAt = row.deleted_at == null ? null : toMs(row.deleted_at)
@@ -171,7 +171,7 @@ async function applyRemoteRow(db: TripMateDB, def: EntityDef, row: RemoteRow, tr
     if (!local) {
       if (remoteDeletedAt) return                                        // 삭제된 행은 새로 만들지 않는다
       const rec: Record<string, unknown> = {
-        id, ...(def.hasTripId ? { tripId } : {}), ...fromRemoteRow(def, row),
+        id, ...(def.hasTripId ? { tripId } : {}), ...fromRemoteRow(def, row, ctx),
         version: remoteVersion, updatedAt: Date.now(), deletedAt: null, syncState: 'synced',
       }
       await table(db, def).put(rec as Rec)
@@ -198,7 +198,7 @@ async function applyRemoteRow(db: TripMateDB, def: EntityDef, row: RemoteRow, tr
     const protectedFields = new Set<string>()
     for (const e of pending) { if (e.changedFields.includes('*')) def.fields.forEach((f) => protectedFields.add(f.local)); else e.changedFields.forEach((f) => protectedFields.add(f)) }
     for (const c of myConflicts) if (c.kind === 'field') protectedFields.add(c.field)
-    const incoming = fromRemoteRow(def, row)
+    const incoming = fromRemoteRow(def, row, ctx)
     const patch: Record<string, unknown> = { version: Math.max(remoteVersion, local.version) }
     let changed = false
     for (const [k, v] of Object.entries(incoming)) if (!protectedFields.has(k) && !same(local[k], v)) { patch[k] = v; changed = true }
@@ -209,7 +209,7 @@ async function applyRemoteRow(db: TripMateDB, def: EntityDef, row: RemoteRow, tr
 }
 
 export type ProgressFn = (done: number, total: number, label: string) => void
-const STAGE_LABEL: Record<string, string> = { trips: '여행 정보', places: '장소', itinerary_items: '일정', checklist_items: '준비물', expense_categories: '지출 항목', shopping_items: '쇼핑 리스트' }
+const STAGE_LABEL: Record<string, string> = { trips: '여행 정보', places: '장소', itinerary_items: '일정', checklist_items: '준비물', expense_categories: '지출 항목', shopping_items: '쇼핑 리스트', expenses: '경비' }
 
 async function pullTrip(db: TripMateDB, remote: RemoteAdapter, tripId: string, report: SyncReport, fromScratch: boolean, timeoutMs: number, onProgress?: ProgressFn) {
   const meta = await getMeta(db, tripId)
@@ -223,7 +223,7 @@ async function pullTrip(db: TripMateDB, remote: RemoteAdapter, tripId: string, r
     const rows = await withTimeout(remote.pull(def.table, tripId, since), timeoutMs)
     let newest = prev
     for (const r of rows) {
-      await applyRemoteRow(db, def, r, tripId, report)
+      await applyRemoteRow(db, def, r, tripId, report, { userId: remote.userId() })
       const u = toMs(r.updated_at)
       if (u !== null && u > newest) newest = u
     }

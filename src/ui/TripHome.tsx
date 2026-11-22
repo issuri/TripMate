@@ -5,6 +5,7 @@ import type { Trip } from '../db/types'
 import { addDays, computeStatus, daysBetween, todayIn } from '../lib/dates'
 import { computeGuide, nextItem } from '../lib/guide'
 import { Card, KIND_EMOJI, KIND_LABEL } from './kit'
+import ExpenseSummary from './ExpenseSummary'
 import NotificationCard from './NotificationCard'
 import OfflineSummary from './OfflineSummary'
 
@@ -64,6 +65,8 @@ export default function TripHome() {
           {trip.purpose && <span className="text-sm text-ink-2">{trip.purpose}</span>}
         </div>
       )}
+
+      <ExpenseSummary trip={trip} />
 
       <OfflineSummary trip={trip} />
 

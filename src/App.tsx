@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ChecklistPage from './ui/ChecklistPage'
 import DayPage from './ui/DayPage'
 import MapPage from './ui/MapPage'
+import ExpensesPage from './ui/ExpensesPage'
 import JoinPage from './ui/JoinPage'
 import LoginPage from './ui/LoginPage'
 import OfflinePage from './ui/OfflinePage'
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="checklist" element={<ChecklistPage />} />
           <Route path="offline" element={<OfflinePage />} />
           <Route path="share" element={<SharePage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

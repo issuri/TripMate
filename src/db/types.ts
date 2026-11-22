@@ -81,19 +81,33 @@ export interface ExpenseCategory extends SyncMeta {
   sortOrder: number
 }
 
+/**
+ * 지출의 "돈" 부분. 한 덩어리로 저장·동기화해서 금액과 분담이 어긋나는 일이 없다(동기화는 필드 단위로 병합하므로).
+ * 모든 금액은 최소 통화 단위 정수이고, 부동소수점을 쓰지 않는다.
+ *  - localMinor: 실제 결제한 현지 통화 금액
+ *  - rateMicro : 지출 당시 적용한 환율(1 현지 통화 단위 = rateMicro/1e6 원). 직접 입력한 값이 우선
+ *  - homeMinor : 원화 환산 금액(현지 금액과 별도로 저장). 분담 합계의 기준
+ *  - payer     : 실제 결제한 사람의 키, splits: 공동 경비의 참여자별 부담액(원화). shared 가 false 면 빈 배열
+ * 사람 키: 'self'(이 기기의 사용자), 계정이 있는 동행자의 사용자 UUID, 계정이 없는 동행자 'n:이름'.
+ */
+export interface Money {
+  localMinor: number
+  currency: string
+  rateMicro: number
+  homeMinor: number
+  shared: boolean
+  payer: string | null
+  splits: { k: string; s: number }[]
+}
+
 export interface Expense extends SyncMeta {
   categoryId: string
-  amountLocalMinor: number
-  localCurrency: string
-  fxRateMicro: number
-  amountHomeMinor: number
-  paidAt: number
+  paidAt: number           // 결제 시각(UTC ms). 날짜 구분은 여행지 시간대 기준
   paymentMethod: string
-  payerId: string | null
-  isShared: boolean
   itineraryItemId: string | null
   shoppingItemId: string | null
   memo: string
+  money: Money
 }
 
 export type ReminderKind = 'start' | 'leave' | 'trip_eve'

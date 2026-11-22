@@ -7,7 +7,9 @@ import { addShopping, deleteShopping, setPurchased, updateShopping } from '../db
 import type { ShoppingItem, Trip } from '../db/types'
 import { formatMinor, parseMajor } from '../lib/money'
 import { placeUrl } from '../lib/maps'
+import { listExpenses } from '../db/expenses'
 import { changedFields } from '../lib/diff'
+import ExpenseSheet from './ExpenseSheet'
 import { summarizeShopping } from '../lib/shopping'
 import { btnGhost, btnPrimary, Card, Field, input, Sheet } from './kit'
 
@@ -17,6 +19,9 @@ export default function ShoppingPage() {
   const items = useLiveQuery(() => db.shoppingItems.where('tripId').equals(trip.id).filter((s) => !s.deletedAt).toArray(), [trip.id]) ?? []
   const places = useLiveQuery(() => db.places.where('tripId').equals(trip.id).filter((p) => !p.deletedAt).toArray(), [trip.id]) ?? []
   const itinerary = useLiveQuery(() => db.itineraryItems.where('tripId').equals(trip.id).filter((i) => !i.deletedAt).toArray(), [trip.id]) ?? []
+  const expenses = useLiveQuery(() => listExpenses(trip.id), [trip.id]) ?? []
+  const recorded = new Set(expenses.map((e) => e.shoppingItemId).filter((x): x is string => !!x))
+  const [recordFor, setRecordFor] = useState<ShoppingItem | null>(null)
   const [editing, setEditing] = useState<ShoppingItem | 'new' | null>(null)
   const [paying, setPaying] = useState<ShoppingItem | null>(null)
   const [budgetEdit, setBudgetEdit] = useState<string | null>(null)
@@ -84,6 +89,10 @@ export default function ShoppingPage() {
                       {s.memo && ` · ${s.memo}`}
                     </p>
                   </button>
+                  {/* 구매 완료 + 실제 결제 금액이 있으면 사용자가 확인한 뒤 지출로 기록한다(예상 가격은 절대 자동으로 지출이 되지 않는다) */}
+                  {s.purchased && s.actualPriceMinor != null && (recorded.has(s.id)
+                    ? <span className="shrink-0 rounded-full bg-mint/15 px-2.5 py-1 text-[11px] font-bold text-mint">지출 기록됨</span>
+                    : <button className="shrink-0 rounded-full bg-signal-soft px-3 py-2 text-xs font-semibold text-signal" onClick={() => setRecordFor(s)}>지출로 기록</button>)}
                 </li>
               ))}
             </ul>
@@ -94,6 +103,7 @@ export default function ShoppingPage() {
       <button className={`${btnPrimary} w-full`} onClick={() => setEditing('new')}>상품 추가</button>
 
       {paying && <PaySheet item={paying} cur={cur} onClose={() => setPaying(null)} />}
+      {recordFor && <ExpenseSheet trip={trip} preset={{ shoppingItemId: recordFor.id, categoryHint: 'shopping', localMinor: recordFor.actualPriceMinor ?? undefined, currency: recordFor.currency, memo: recordFor.name }} onClose={() => setRecordFor(null)} />}
       {editing && <ItemSheet trip={trip} item={editing === 'new' ? null : editing} places={places} itinerary={itinerary} onClose={() => setEditing(null)} />}
     </div>
   )

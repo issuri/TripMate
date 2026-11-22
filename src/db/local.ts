@@ -49,9 +49,9 @@ export const db = new TripMateDB()
  * 동기화 도입 전에 만든 데이터(예: 여행 생성 때 자동으로 만든 기본 지출 항목·체크리스트)가 서버에 영원히 올라가지 않는 것을 막는다.
  */
 export async function queueOrphanedLocalRecords(d: TripMateDB = db): Promise<number> {
-  const targets: [keyof TripMateDB & string, string][] = [['trips', 'trips'], ['places', 'places'], ['itineraryItems', 'itinerary_items'], ['checklistItems', 'checklist_items'], ['expenseCategories', 'expense_categories'], ['shoppingItems', 'shopping_items']]
+  const targets: [keyof TripMateDB & string, string][] = [['trips', 'trips'], ['places', 'places'], ['itineraryItems', 'itinerary_items'], ['checklistItems', 'checklist_items'], ['expenseCategories', 'expense_categories'], ['shoppingItems', 'shopping_items'], ['expenses', 'expenses']]
   let added = 0
-  await d.transaction('rw', [d.trips, d.places, d.itineraryItems, d.checklistItems, d.expenseCategories, d.shoppingItems, d.outbox], async () => {
+  await d.transaction('rw', [d.trips, d.places, d.itineraryItems, d.checklistItems, d.expenseCategories, d.shoppingItems, d.expenses, d.outbox], async () => {
     const queued = new Set((await d.outbox.toArray()).map((e) => e.recordId))
     for (const [store, serverTable] of targets) {
       const rows = (await (d[store as 'trips'] as unknown as Table<{ id: string; version?: number; deletedAt: number | null }, string>).toArray())

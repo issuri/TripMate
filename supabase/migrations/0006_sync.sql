@@ -48,6 +48,7 @@ declare
   n_rows int;
   fv_v int;
   fv_c text;
+  norm_json jsonb;
 begin
   if not (p_table = any (allowed)) then
     raise exception 'sync_apply: table % is not allowed', p_table using errcode = '22023';
@@ -108,13 +109,16 @@ begin
   -- ───── 필드 단위 병합 ─────
   fv := coalesce(cur_json->'field_versions', '{}'::jsonb);
   new_version := (cur_json->>'version')::int + 1;
+  -- 비교는 컬럼 타입으로 정규화한 값끼리 한다. 같은 시각이어도 서버는 '…+00:00', 클라이언트는 '…Z' 로 적고
+  -- time 은 '09:00' 과 '09:00:00' 처럼 표기가 달라, 문자열을 그대로 비교하면 같은 값을 "다르다"고 보고 가짜 충돌을 만든다.
+  execute format('select to_jsonb(jsonb_populate_record(null::public.%I, $1))', p_table) into norm_json using p_fields;
   for k in select jsonb_object_keys(p_fields) loop
     if k = any (protected) then continue; end if;
     if not (k = any (cols)) then raise exception 'sync_apply: unknown column %', k using errcode = '22023'; end if;
     -- 서버의 이 필드가 클라이언트가 본 버전보다 나중에, 다른 기기에서 바뀌었고 값이 다르면 충돌
     fv_v := case jsonb_typeof(fv->k) when 'object' then (fv->k->>'v')::int when 'number' then (fv->>k)::int else 1 end;
     fv_c := case when jsonb_typeof(fv->k) = 'object' then fv->k->>'c' end;
-    if fv_v > p_base_version and (p_client is null or fv_c is distinct from p_client) and (cur_json->k) is distinct from (p_fields->k) then
+    if fv_v > p_base_version and (p_client is null or fv_c is distinct from p_client) and (cur_json->k) is distinct from (norm_json->k) then
       conflicts := conflicts || jsonb_build_array(jsonb_build_object('field', k, 'remote', cur_json->k, 'local', p_fields->k));
     else
       applied := applied || jsonb_build_object(k, p_fields->k);

@@ -121,7 +121,8 @@ describe('roles and membership management', () => {
     await s.as(U.B)
     const cat = '30000000-0000-0000-0000-000000000001'
     await s.pg.exec(`insert into expense_categories (id, trip_id, name) values ('${cat}', '${TRIP}', '식비')`)
-    await s.pg.exec(`insert into expenses (id, trip_id, category_id, amount_local_minor, local_currency, amount_home_minor, payer_id) values (gen_random_uuid(), '${TRIP}', '${cat}', 100, 'KRW', 100, '${U.B}')`)
+    const money = JSON.stringify({ localMinor: 100, currency: 'KRW', rateMicro: 1000000, homeMinor: 100, shared: false, payer: U.B, splits: [] })
+    await s.pg.exec(`insert into expenses (id, trip_id, category_id, money) values (gen_random_uuid(), '${TRIP}', '${cat}', '${money}'::jsonb)`)
     await expect(s.rpc(U.B, 'remove_member', [TRIP, U.C])).rejects.toThrow(/forbidden/)  // 멤버는 내보낼 수 없다
     await expect(s.rpc(U.A, 'remove_member', [TRIP, U.A])).rejects.toThrow(/use_leave/)
     await s.rpc(U.A, 'remove_member', [TRIP, U.B])                                     // B가 결제자인 지출이 있어도 가능(삭제가 아님)

@@ -42,6 +42,7 @@ export default function TripLayout() {
         <NavLink to={`/trips/${id}/day/1`} className={tab}><Icon name="route" className="h-5 w-5" />일정</NavLink>
         <NavLink to={`/trips/${id}/map`} className={tab}><Icon name="map" className="h-5 w-5" />지도</NavLink>
         <NavLink to={`/trips/${id}/shopping`} className={tab}><Icon name="bag" className="h-5 w-5" />쇼핑</NavLink>
+        <NavLink to={`/trips/${id}/expenses`} className={tab}><Icon name="wallet" className="h-5 w-5" />경비</NavLink>
         <NavLink to={`/trips/${id}/checklist`} className={tab}><Icon name="check" className="h-5 w-5" />준비물</NavLink>
       </nav>
     </div>

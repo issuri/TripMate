@@ -6,7 +6,10 @@ import { db } from '../db/local'
 import type { ItemKind, ItineraryItem, Trip } from '../db/types'
 import { addDays, daysBetween } from '../lib/dates'
 import { changedFields } from '../lib/diff'
+import { dateIn } from '../lib/budget'
 import { gapMinutes } from '../lib/guide'
+import { listExpenses } from '../db/expenses'
+import ExpenseSheet from './ExpenseSheet'
 import { btnGhost, btnPrimary, Field, input, KIND_EMOJI, KIND_LABEL, Sheet } from './kit'
 
 const MODE = { walk: '🚶 도보', transit: '🚇 대중교통', drive: '🚗 차량' } as const
@@ -20,6 +23,12 @@ export default function DayPage() {
   const [editing, setEditing] = useState<ItineraryItem | 'new' | null>(null)
   const places = useLiveQuery(() => db.places.where('tripId').equals(trip.id).filter((p) => !p.deletedAt).toArray(), [trip.id]) ?? []
   const placeName = (it: ItineraryItem) => places.find((p) => p.id === it.placeId)?.name ?? it.locationText
+  // 경비 연동: 날짜별 지출 합계(여행지 날짜 기준)와 일정별 지출, 일정에서 바로 지출 등록
+  const expenses = useLiveQuery(() => listExpenses(trip.id), [trip.id]) ?? []
+  const [expenseFor, setExpenseFor] = useState<ItineraryItem | null>(null)
+  const dayDate = addDays(trip.startDate, day - 1)
+  const dayTotal = expenses.filter((e) => dateIn(e.paidAt, trip.timeZone) === dayDate).reduce((a, e) => a + e.money.homeMinor, 0)
+  const itemTotal = (id: string) => expenses.filter((e) => e.itineraryItemId === id).reduce((a, e) => a + e.money.homeMinor, 0)
 
   // 알림을 눌러 들어오면(?item=일정id) 해당 일정의 상세(편집) 시트를 바로 연다
   const [sp, setSp] = useSearchParams()
@@ -41,7 +50,7 @@ export default function DayPage() {
           <Link key={d} to={`/trips/${trip.id}/day/${d}`} className={`num shrink-0 rounded-full px-4 py-2.5 text-sm font-bold ${d === day ? 'bg-ink text-white' : 'bg-white text-ink-2 ring-1 ring-line'}`}>DAY {d}</Link>
         ))}
       </div>
-      <p className="num px-1 text-sm text-ink-2">{addDays(trip.startDate, day - 1)} · 완료 {items.filter((i) => i.completed).length}/{items.length}</p>
+      <p className="num px-1 text-sm text-ink-2">{dayDate} · 완료 {items.filter((i) => i.completed).length}/{items.length}{dayTotal > 0 && <> · 이 날 지출 <b>{dayTotal.toLocaleString('ko-KR')}원</b></>}</p>
 
       {items.length === 0 && (
         <div className="rounded-[1.25rem] border-2 border-dashed border-line p-8 text-center">
@@ -70,6 +79,7 @@ export default function DayPage() {
                   <p className={`mt-0.5 text-[17px] font-bold leading-snug ${it.completed ? 'line-through' : ''}`}>{KIND_EMOJI[it.kind]} {it.title}</p>
                   {placeName(it) && <p className="mt-0.5 text-sm text-ink-2">{it.placeId ? '📍 ' : ''}{placeName(it)}</p>}
                   {it.memo && <p className="mt-1.5 text-sm text-ink-3">{it.memo}</p>}
+                  {itemTotal(it.id) > 0 && <p className="num mt-1.5 text-xs font-semibold text-signal">💰 지출 {itemTotal(it.id).toLocaleString('ko-KR')}원</p>}
                   {it.reminderEnabled && it.startTime && !it.completed && <p className="num mt-1.5 text-xs text-ink-3">🔔 {it.reminderMinutesBefore ? (it.reminderMinutesBefore === 1440 ? '하루 전' : it.reminderMinutesBefore >= 60 && it.reminderMinutesBefore % 60 === 0 ? `${it.reminderMinutesBefore / 60}시간 전` : `${it.reminderMinutesBefore}분 전`) : '시작 시각'}</p>}
                 </button>
                 <div className="flex flex-col items-center gap-1">
@@ -83,12 +93,13 @@ export default function DayPage() {
         })}
       </ol>
       <button className={`${btnPrimary} w-full`} onClick={() => setEditing('new')}>일정 추가</button>
-      {editing && <ItemSheet trip={trip} total={total} day={day} item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && <ItemSheet trip={trip} total={total} day={day} item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onAddExpense={(it) => { setEditing(null); setExpenseFor(it) }} />}
+      {expenseFor && <ExpenseSheet trip={trip} preset={{ itineraryItemId: expenseFor.id, categoryHint: expenseFor.kind }} onClose={() => setExpenseFor(null)} />}
     </div>
   )
 }
 
-function ItemSheet({ trip, total, day, item, onClose }: { trip: Trip; total: number; day: number; item: ItineraryItem | null; onClose: () => void }) {
+function ItemSheet({ trip, total, day, item, onClose, onAddExpense }: { trip: Trip; total: number; day: number; item: ItineraryItem | null; onClose: () => void; onAddExpense: (item: ItineraryItem) => void }) {
   const [f, setF] = useState({
     title: item?.title ?? '', kind: (item?.kind ?? 'sight') as ItemKind, dayNumber: item?.dayNumber ?? day,
     startTime: item?.startTime ?? '', endTime: item?.endTime ?? '', locationText: item?.locationText ?? '', memo: item?.memo ?? '',
@@ -151,6 +162,7 @@ function ItemSheet({ trip, total, day, item, onClose }: { trip: Trip; total: num
           {f.reminderEnabled && f.travelMinutes !== '' && <p className="mt-2 text-xs text-ink-3">이동 시간이 입력되어 있어 출발할 시각에도 알려드려요.</p>}
         </div>
         {err && <p className="rounded-2xl bg-danger/10 p-3 text-sm text-danger" role="alert">{err}</p>}
+        {item && <button type="button" className={`${btnGhost} w-full`} onClick={() => onAddExpense(item)}>💰 이 일정에 지출 추가</button>}
         <div className="flex gap-2">
           {item && <button className={`${btnGhost} text-danger`} onClick={async () => { if (confirm('이 일정을 삭제할까요?')) { await deleteItem(item.id); onClose() } }}>삭제</button>}
           <button className={`${btnPrimary} flex-1`} onClick={save}>저장</button>
