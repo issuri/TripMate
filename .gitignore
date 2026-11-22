@@ -25,3 +25,6 @@ dist-ssr
 
 .env.local
 .env
+
+# 개인 작업 도구 설정
+.claude/

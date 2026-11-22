@@ -1,0 +1,45 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 기본 권한은 읽기만. 게시 단계에서만 필요한 권한을 따로 준다.
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm test          # 테스트가 실패하면 게시하지 않는다
+      - run: npm run build
+      # GitHub Pages 는 없는 주소에 404.html 을 보여준다. 앱 화면으로 쓰면 주소를 직접 열거나 새로고침해도 동작한다.
+      - run: cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

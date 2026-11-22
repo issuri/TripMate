@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # 의존 패키지와 자동 배포 도구의 보안 업데이트를 매주 확인한다
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
