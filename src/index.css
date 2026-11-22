@@ -1,0 +1,47 @@
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "tailwindcss";
+
+/* 디자인 토큰 — 다음 일정(coral)만 강한 색을 쓰고 나머지는 조용하게 유지한다. */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif;
+  --color-paper: #f3f4f8;
+  --color-ink: #0f1424;
+  --color-ink-2: #5b6275;
+  --color-ink-3: #9ba1b2;
+  --color-line: #e4e6ee;
+  --color-signal: #3358ff;
+  --color-signal-soft: #e8edff;
+  --color-coral: #ff6a3d;
+  --color-mint: #12a679;
+  --color-danger: #e5484d;
+  --radius-card: 1.25rem;
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  margin: 0; background: var(--color-paper); color: var(--color-ink);
+  font-family: var(--font-sans); letter-spacing: -0.01em; -webkit-font-smoothing: antialiased;
+}
+.num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 2px; }
+
+/* 탑승권 느낌의 티켓: 양옆 반원 노치 */
+.ticket {
+  --n: 10px;
+  -webkit-mask: radial-gradient(circle var(--n) at 0 var(--cut), #0000 98%, #000) left / 51% 100% no-repeat,
+                radial-gradient(circle var(--n) at 100% var(--cut), #0000 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle var(--n) at 0 var(--cut), #0000 98%, #000) left / 51% 100% no-repeat,
+        radial-gradient(circle var(--n) at 100% var(--cut), #0000 98%, #000) right / 51% 100% no-repeat;
+}
+
+/* 체크박스: 눌렀을 때만 반응 */
+.check { appearance: none; width: 1.6rem; height: 1.6rem; border-radius: 9999px; border: 2px solid var(--color-ink-3); display: grid; place-content: center; flex: none; background: #fff; transition: background .15s, border-color .15s, transform .15s; }
+.check:checked { background: var(--color-mint); border-color: var(--color-mint); }
+.check:checked::after { content: ""; width: .35rem; height: .7rem; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.check:active { transform: scale(.85); }
+
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.sheet { animation: sheet-up .28s cubic-bezier(.2,.8,.2,1); }
+.scrim { animation: fade .2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .sheet, .scrim { animation: none; } * { transition: none !important; } }
