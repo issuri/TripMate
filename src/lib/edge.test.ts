@@ -94,6 +94,43 @@ describe('data-layer input validation', () => {
   })
 })
 
+describe('concurrent edits do not clobber each other', () => {
+  it('a stale edit form only changes the fields the user actually touched', async () => {
+    const { updateItem } = await import('../db/itinerary')
+    const { addShopping, updateShopping } = await import('../db/shopping')
+    const { changedFields } = await import('./diff')
+    const db = new TripMateDB('c-' + Math.random()); await db.open()
+    const t = await createTrip({ name: 'T', country: '', city: '', startDate: '2026-12-01', endDate: '2026-12-02' }, db)
+    const it = await addItem(t.id, { dayNumber: 1, kind: 'sight', title: '원래 제목', memo: '원래 메모', startTime: '10:00' }, db)
+    const opened = { ...it }                                         // 나: 편집 화면을 연 시점의 값
+    await updateItem(it.id, { memo: '동행자가 고친 메모', startTime: '11:00' }, db) // 동행자: 같은 시간에 메모·시간 수정
+    // 나: 제목만 바꾸고 저장(화면은 모든 필드를 오래된 값으로 들고 있음)
+    const form = { title: '내가 고친 제목', kind: opened.kind, dayNumber: 1, startTime: opened.startTime, endTime: opened.endTime, memo: opened.memo, travelMinutes: null }
+    await updateItem(it.id, changedFields(opened as unknown as Record<string, unknown>, form), db)
+    const cur = (await db.itineraryItems.get(it.id))!
+    expect(cur.title).toBe('내가 고친 제목')
+    expect(cur.memo).toBe('동행자가 고친 메모')       // 덮어써지지 않음
+    expect(cur.startTime).toBe('11:00')                 // 덮어써지지 않음
+
+    const s = await addShopping(t.id, { name: '과자', quantity: 1, expectedPriceMinor: 500 }, db)
+    await updateShopping(s.id, { expectedPriceMinor: 900 }, db)       // 동행자가 가격 수정
+    await updateShopping(s.id, changedFields({ ...s } as unknown as Record<string, unknown>, { name: '새 이름', quantity: 1, expectedPriceMinor: 500 }), db)
+    const sc = (await db.shoppingItems.get(s.id))!
+    expect([sc.name, sc.expectedPriceMinor]).toEqual(['새 이름', 900])
+  })
+  it('unchanged saves are no-ops and record nothing in the sync queue', async () => {
+    const { updateItem } = await import('../db/itinerary')
+    const db = new TripMateDB('n-' + Math.random()); await db.open()
+    const t = await createTrip({ name: 'T', country: '', city: '', startDate: '2026-12-01', endDate: '2026-12-02' }, db)
+    const it = await addItem(t.id, { dayNumber: 1, kind: 'sight', title: ' 제목 ' }, db)
+    await db.outbox.clear()
+    await updateItem(it.id, { title: '제목', memo: '' }, db)
+    expect(await db.outbox.count()).toBe(0)
+    await updateItem(it.id, { memo: '메모' }, db)
+    expect((await db.outbox.toArray())[0].changedFields).toEqual(['memo'])
+  })
+})
+
 describe('length limits protect storage and layout', () => {
   it('rejects oversized text in items, checklist, shopping and trip edits', async () => {
     const db = new TripMateDB('l-' + Math.random()); await db.open()

@@ -7,6 +7,7 @@ import { addShopping, deleteShopping, setPurchased, updateShopping } from '../db
 import type { ShoppingItem, Trip } from '../db/types'
 import { formatMinor, parseMajor } from '../lib/money'
 import { placeUrl } from '../lib/maps'
+import { changedFields } from '../lib/diff'
 import { summarizeShopping } from '../lib/shopping'
 import { btnGhost, btnPrimary, Card, Field, input, Sheet } from './kit'
 
@@ -140,7 +141,12 @@ function ItemSheet({ trip, item, places, itinerary, onClose }: { trip: Trip; ite
     const data = { name: f.name, quantity: Number(f.quantity), expectedPriceMinor: price, storePlaceId: f.store || null, itineraryItemId: f.link || null, memo: f.memo, currency: cur }
     if (busy.current) return
     busy.current = true
-    try { if (item) await updateShopping(item.id, data); else await addShopping(trip.id, data); onClose() } catch (e) { setErr((e as Error).message); busy.current = false }
+    try {
+      // 수정은 내가 바꾼 필드만 보낸다(편집 중 동행자가 고친 다른 필드를 오래된 값으로 덮어쓰지 않도록)
+      if (item) { const mine = changedFields(item as unknown as Record<string, unknown>, data); if (Object.keys(mine).length) await updateShopping(item.id, mine) }
+      else await addShopping(trip.id, data)
+      onClose()
+    } catch (e) { setErr((e as Error).message); busy.current = false }
   }
   return (
     <Sheet title={item ? '상품 수정' : '상품 추가'} onClose={onClose}>

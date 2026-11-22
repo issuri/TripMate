@@ -81,6 +81,38 @@ describe('SQL migrations', () => {
     expect((await pg.query<{ name: string }>(`select name from trips`)).rows[0].name).toBe('T')
   })
 
+  it('records cannot reference rows that belong to a different trip', async () => {
+    const T2 = '10000000-0000-0000-0000-000000000002'
+    const C1 = '30000000-0000-0000-0000-000000000001', C2 = '30000000-0000-0000-0000-000000000002'
+    const I1 = '20000000-0000-0000-0000-000000000001'
+    await as(A)
+    await pg.exec(`insert into trips (id, owner_id, name, start_date, end_date) values ('${T2}', '${A}', 'T2', '2026-12-01', '2026-12-02')`)
+    await pg.exec(`insert into expense_categories (id, trip_id, name) values ('${C1}', '${TRIP}', '식비'), ('${C2}', '${T2}', '식비')`)
+    // 정상: 같은 여행의 항목
+    await pg.exec(`insert into expenses (id, trip_id, category_id, amount_local_minor, local_currency, amount_home_minor) values (gen_random_uuid(), '${T2}', '${C2}', 100, 'KRW', 100)`)
+    // 다른 여행의 지출 항목/일정/장소를 참조하는 데이터는 거부되어야 한다
+    await expect(pg.exec(`insert into expenses (id, trip_id, category_id, amount_local_minor, local_currency, amount_home_minor) values (gen_random_uuid(), '${T2}', '${C1}', 100, 'KRW', 100)`)).rejects.toThrow()
+    await expect(pg.exec(`insert into expenses (id, trip_id, category_id, itinerary_item_id, amount_local_minor, local_currency, amount_home_minor) values (gen_random_uuid(), '${T2}', '${C2}', '${I1}', 100, 'KRW', 100)`)).rejects.toThrow()
+    const P1 = '40000000-0000-0000-0000-000000000001'
+    await pg.exec(`insert into places (id, trip_id, name) values ('${P1}', '${TRIP}', '장소')`)
+    await expect(pg.exec(`insert into itinerary_items (id, trip_id, day_number, title, place_id) values (gen_random_uuid(), '${T2}', 1, 'x', '${P1}')`)).rejects.toThrow()
+    await expect(pg.exec(`insert into shopping_items (id, trip_id, name, store_place_id) values (gen_random_uuid(), '${T2}', 'x', '${P1}')`)).rejects.toThrow()
+  })
+
+  it('expense payer and split participants must be members of that trip', async () => {
+    const T2 = '10000000-0000-0000-0000-000000000002'
+    const C2 = '30000000-0000-0000-0000-000000000002'
+    const E = '50000000-0000-0000-0000-000000000001'
+    await as(A)
+    // B는 T2의 멤버가 아니다
+    await expect(pg.exec(`insert into expenses (id, trip_id, category_id, amount_local_minor, local_currency, amount_home_minor, payer_id) values ('${E}', '${T2}', '${C2}', 100, 'KRW', 100, '${B}')`)).rejects.toThrow()
+    await pg.exec(`insert into expenses (id, trip_id, category_id, amount_local_minor, local_currency, amount_home_minor, payer_id) values ('${E}', '${T2}', '${C2}', 100, 'KRW', 100, '${A}')`)
+    await expect(pg.exec(`insert into expense_splits (expense_id, user_id, trip_id, share_home_minor) values ('${E}', '${B}', '${T2}', 100)`)).rejects.toThrow()
+    await pg.exec(`insert into expense_splits (expense_id, user_id, trip_id, share_home_minor) values ('${E}', '${A}', '${T2}', 100)`)
+    // 분담 행의 trip_id 가 지출의 trip_id 와 다르면 거부
+    await expect(pg.exec(`insert into expense_splits (expense_id, user_id, trip_id, share_home_minor) values ('${E}', '${A}', '${TRIP}', 0)`)).rejects.toThrow()
+  })
+
   it('rejects invalid data: dates, negative money', async () => {
     await as(A)
     await expect(pg.exec(`insert into trips (id, owner_id, name, start_date, end_date) values (gen_random_uuid(), '${A}', 'bad', '2026-12-05', '2026-12-01')`)).rejects.toThrow()

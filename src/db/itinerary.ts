@@ -78,17 +78,22 @@ export async function updateItem(id: string, patch: Partial<ItemInput>, db: Trip
     const cur = await db.itineraryItems.get(id)
     if (!cur || cur.deletedAt !== null) throw new Error('일정을 찾을 수 없습니다. 다른 사용자가 삭제했을 수 있습니다.')
     tripId = cur.tripId
-    const next = { ...cur, ...patch }
-    const err = validateItem(next)
+    // 실제로 바뀐 필드만 저장·기록한다. 편집 화면은 모든 필드를 한꺼번에 넘기므로, 걸러내지 않으면
+    // 동행자가 같은 시간에 고친 다른 필드(메모, 시간 등)를 화면에 있던 오래된 값으로 되돌리게 된다.
+    const norm = { ...patch }
+    if (norm.title !== undefined) norm.title = norm.title.trim()
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+    const diff = Object.fromEntries(Object.entries(norm).filter(([k, v]) => v !== undefined && !same(v, (cur as unknown as Record<string, unknown>)[k]))) as Partial<ItineraryItem>
+    const err = validateItem({ ...cur, ...norm })
     if (err) throw new Error(err)
-    const changes: Partial<ItineraryItem> = { ...patch, ...PENDING() }
-    if (patch.title !== undefined) changes.title = patch.title.trim()
-    if (patch.dayNumber !== undefined && patch.dayNumber !== cur.dayNumber) {
-      const sib = await db.itineraryItems.where({ tripId: cur.tripId, dayNumber: patch.dayNumber }).filter((i) => i.deletedAt === null).toArray()
-      changes.sortOrder = sortOrderFor(sib, next.startTime)
+    if (Object.keys(diff).length === 0) return // 변경 없음: 큐에 기록하지 않음
+    const changes: Partial<ItineraryItem> = { ...diff, ...PENDING() }
+    if (diff.dayNumber !== undefined) {
+      const sib = await db.itineraryItems.where({ tripId: cur.tripId, dayNumber: diff.dayNumber }).filter((i) => i.deletedAt === null).toArray()
+      changes.sortOrder = sortOrderFor(sib, (diff.startTime ?? cur.startTime) as string | null)
     }
     await db.itineraryItems.update(id, changes)
-    await log(db, 'itineraryItems', id, 'upsert', cur.version, Object.keys(changes).filter((k) => k !== 'syncState'))
+    await log(db, 'itineraryItems', id, 'upsert', cur.version, [...Object.keys(diff), ...(changes.sortOrder !== undefined ? ['sortOrder'] : [])])
   })
   await reconcileTripSafe(tripId, db) // 시간/알림 설정이 바뀌면 기존 예약을 갱신
 }

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { db } from '../db/local'
 import { updateTrip } from '../db/itinerary'
 import { createTrip, deleteTrip, validateTrip } from '../db/trips'
+import { changedFields } from '../lib/diff'
 import { btnGhost, btnPrimary, Card, Field, input } from './kit'
 
 const TZ = [['Asia/Seoul', '한국'], ['Asia/Tokyo', '일본'], ['Asia/Bangkok', '태국/베트남'], ['Asia/Taipei', '대만'], ['Asia/Singapore', '싱가포르'],
@@ -19,10 +20,12 @@ export default function TripForm() {
   const [busy, setBusy] = useState(false) // 버튼 비활성화 표시용
   const submitting = useRef(false)        // 연타 방지는 ref로(상태는 같은 틱의 연속 클릭을 막지 못함)
   const loaded = useRef(false)
+  const snapshot = useRef<Record<string, unknown> | null>(null)
   useEffect(() => {
     // 처음 한 번만 채운다(다른 곳에서 데이터가 바뀌어도 입력 중인 내용을 덮어쓰지 않음)
     if (existing && !loaded.current) {
       loaded.current = true
+      snapshot.current = existing as unknown as Record<string, unknown> // 폼을 연 시점의 값(변경 비교 기준)
       const { name, country, city, startDate, endDate, timeZone, purpose, localCurrency } = existing
       setF({ name, country, city, startDate, endDate, timeZone, purpose, localCurrency, companions: existing.companions.join(', '), coverImage: existing.coverImage ?? '' })
     }
@@ -63,7 +66,8 @@ export default function TripForm() {
     if (v) return setErr(v)
     submitting.current = true; setBusy(true)
     try {
-      if (id) { await updateTrip(id, data); nav(`/trips/${id}`) }
+      // 수정은 내가 바꾼 필드만 보낸다(폼을 여는 동안 동행자가 고친 다른 필드를 덮어쓰지 않도록)
+      if (id) { await updateTrip(id, snapshot.current ? changedFields(snapshot.current, data) : data); nav(`/trips/${id}`) }
       else { const t = await createTrip(data); nav(`/trips/${t.id}`) }
     } catch (e) { setErr((e as Error).message); submitting.current = false; setBusy(false) }
   }

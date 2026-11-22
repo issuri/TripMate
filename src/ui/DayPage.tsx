@@ -5,6 +5,7 @@ import { addItem, byOrder, deleteItem, moveItem, setCompleted, updateItem, type 
 import { db } from '../db/local'
 import type { ItemKind, ItineraryItem, Trip } from '../db/types'
 import { addDays, daysBetween } from '../lib/dates'
+import { changedFields } from '../lib/diff'
 import { gapMinutes } from '../lib/guide'
 import { btnGhost, btnPrimary, Field, input, KIND_EMOJI, KIND_LABEL, Sheet } from './kit'
 
@@ -69,7 +70,7 @@ export default function DayPage() {
                   <p className={`mt-0.5 text-[17px] font-bold leading-snug ${it.completed ? 'line-through' : ''}`}>{KIND_EMOJI[it.kind]} {it.title}</p>
                   {placeName(it) && <p className="mt-0.5 text-sm text-ink-2">{it.placeId ? '📍 ' : ''}{placeName(it)}</p>}
                   {it.memo && <p className="mt-1.5 text-sm text-ink-3">{it.memo}</p>}
-                  {it.reminderEnabled && it.startTime && !it.completed && <p className="num mt-1.5 text-xs text-ink-3">🔔 {it.reminderMinutesBefore ? `${it.reminderMinutesBefore >= 60 ? `${it.reminderMinutesBefore / 60}시간` : `${it.reminderMinutesBefore}분`} 전` : '시작 시각'}</p>}
+                  {it.reminderEnabled && it.startTime && !it.completed && <p className="num mt-1.5 text-xs text-ink-3">🔔 {it.reminderMinutesBefore ? (it.reminderMinutesBefore === 1440 ? '하루 전' : it.reminderMinutesBefore >= 60 && it.reminderMinutesBefore % 60 === 0 ? `${it.reminderMinutesBefore / 60}시간 전` : `${it.reminderMinutesBefore}분 전`) : '시작 시각'}</p>}
                 </button>
                 <div className="flex flex-col items-center gap-1">
                   <input type="checkbox" className="check" checked={it.completed} onChange={(e) => setCompleted(it.id, e.target.checked)} aria-label="완료" />
@@ -107,7 +108,12 @@ function ItemSheet({ trip, total, day, item, onClose }: { trip: Trip; total: num
     }
     if (busy.current) return // 연속 탭으로 일정이 중복 생성되는 것을 방지
     busy.current = true
-    try { if (item) await updateItem(item.id, data); else await addItem(trip.id, data); onClose() } catch (e) { setErr((e as Error).message); busy.current = false }
+    try {
+      // 수정은 내가 바꾼 필드만 보낸다(편집 중 동행자가 고친 다른 필드를 오래된 값으로 덮어쓰지 않도록)
+      if (item) { const mine = changedFields(item as unknown as Record<string, unknown>, data); if (Object.keys(mine).length) await updateItem(item.id, mine) }
+      else await addItem(trip.id, data)
+      onClose()
+    } catch (e) { setErr((e as Error).message); busy.current = false }
   }
   return (
     <Sheet title={item ? '일정 수정' : '일정 추가'} onClose={onClose}>

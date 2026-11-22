@@ -41,7 +41,11 @@ export async function updateShopping(id: string, patch: Partial<ShoppingInput>, 
   await db.transaction('rw', db.shoppingItems, db.outbox, async () => {
     const cur = await db.shoppingItems.get(id)
     if (!cur || cur.deletedAt !== null) throw new Error('상품을 찾을 수 없습니다. 다른 사용자가 삭제했을 수 있습니다.')
-    const changes = { ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) }
+    // 실제로 바뀐 필드만 저장·기록한다(동행자가 동시에 고친 다른 필드를 오래된 값으로 덮어쓰지 않도록)
+    const norm = { ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) }
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+    const changes = Object.fromEntries(Object.entries(norm).filter(([k, v]) => v !== undefined && !same(v, (cur as unknown as Record<string, unknown>)[k])))
+    if (Object.keys(changes).length === 0) return
     await db.shoppingItems.update(id, { ...changes, ...pending() })
     await logChange(db, 'shopping_items', id, 'upsert', cur.version, Object.keys(changes))
   })
