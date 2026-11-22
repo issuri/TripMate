@@ -4,6 +4,7 @@ import { Link, useOutletContext, useParams, useSearchParams } from 'react-router
 import { addItem, byOrder, deleteItem, moveItem, setCompleted, updateItem, type ItemInput } from '../db/itinerary'
 import { db } from '../db/local'
 import { remindersEnabled } from '../db/reminders'
+import { suggestKind } from '../lib/kindHint'
 import type { ItemKind, ItineraryItem, Trip } from '../db/types'
 import { addDays, daysBetween } from '../lib/dates'
 import { changedFields } from '../lib/diff'
@@ -112,7 +113,17 @@ function ItemSheet({ trip, total, day, item, onClose, onAddExpense }: { trip: Tr
   const saved = useLiveQuery(() => db.places.where('tripId').equals(trip.id).filter((p) => !p.deletedAt).toArray(), [trip.id]) ?? []
   const [err, setErr] = useState<string | null>(null)
   const busy = useRef(false)
-  const s = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  // 새 일정은 제목으로 종류를 추천한다. 사용자가 종류를 직접 고른 뒤에는 바꾸지 않는다.
+  const kindTouched = useRef(!!item)
+  const s = (k: keyof typeof f) => (e: { target: { value: string } }) => {
+    const v = e.target.value
+    if (k === 'kind') kindTouched.current = true
+    setF((p) => {
+      const next = { ...p, [k]: v }
+      if (k === 'title' && !kindTouched.current) { const hint = suggestKind(v); next.kind = hint ?? 'sight' }
+      return next
+    })
+  }
   const save = async () => {
     const data: ItemInput = {
       title: f.title, kind: f.kind, dayNumber: f.dayNumber, startTime: f.startTime || null, endTime: f.endTime || null,

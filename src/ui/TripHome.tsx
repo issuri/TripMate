@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { db } from '../db/local'
 import type { Trip } from '../db/types'
@@ -20,7 +21,10 @@ export default function TripHome() {
   const today = todayIn(trip.timeZone)
   const todayNo = status === 'ongoing' ? daysBetween(trip.startDate, today) : null
   const next = nextItem(items)
-  const stages = computeGuide(items, checklist, total, { domestic: isDomestic(trip) })
+  // 시각이 지난 일정은 가이드에서 지난 것으로 본다(완료 체크 없이도 진행). 화면을 열어 둔 동안에도 갱신되도록 1분마다 다시 계산한다.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t) }, [])
+  const stages = computeGuide(items, checklist, total, { domestic: isDomestic(trip), now, startDate: trip.startDate, timeZone: trip.timeZone })
   const done = items.filter((i) => i.completed).length
   const dday = status === 'planned' ? daysBetween(today, trip.startDate) - 1 : null
   const currentIdx = stages.findIndex((s) => s.state === 'current')
@@ -74,7 +78,8 @@ export default function TripHome() {
       <NotificationCard trip={trip} />
 
       <Card>
-        <h2 className="mb-3 text-base font-bold">여행 가이드</h2>
+        <h2 className="text-base font-bold">여행 가이드</h2>
+        <p className="mb-3 mt-0.5 text-xs text-ink-3">일정의 종류와 완료 체크, 지난 시각으로 지금 어느 단계인지 보여 줘요.</p>
         <ol className="relative">
           {stages.map((s, n) => (
             <li key={s.key} className="relative flex gap-3 pb-4 last:pb-0">
@@ -87,6 +92,7 @@ export default function TripHome() {
                 <p className={`text-[15px] ${s.state === 'current' ? 'font-bold' : s.state === 'empty' ? 'text-ink-3' : 'font-medium'}`}>{s.label}</p>
                 {s.state === 'current' && <p className="text-sm text-coral">{s.pending}개 남음</p>}
                 {s.state === 'empty' && <p className="text-xs text-ink-3">등록된 일정 없음</p>}
+                {s.state !== 'empty' && s.passed > 0 && <p className="text-xs text-ink-3">{s.key === 'prep' ? `미완료 ${s.passed}개 · 출발해서 지난 것으로 봐요` : `${s.passed}개는 시각이 지나 지난 것으로 봐요`}</p>}
               </div>
             </li>
           ))}

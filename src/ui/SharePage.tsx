@@ -133,6 +133,14 @@ export default function SharePage() {
 
       {msg && <p className={`rounded-2xl p-3 text-sm ${msg.ok ? 'bg-mint/10 text-mint' : 'bg-danger/10 text-danger'}`} role={msg.ok ? 'status' : 'alert'}>{msg.text}</p>}
 
+      {/* 오프라인 저장 화면의 입구: 전체 내려받기, 동기화 상태, 이 기기의 사본 삭제 */}
+      <Link to={`/trips/${trip.id}/offline`} className="block">
+        <Card className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><h2 className="text-base font-bold">오프라인 저장·동기화</h2><p className="mt-0.5 text-sm text-ink-2">이 기기에 저장된 상태를 확인하고 관리해요</p></div>
+          <span className="text-xl text-ink-3" aria-hidden>›</span>
+        </Card>
+      </Link>
+
       <Card className="space-y-2">
         <h2 className="text-base font-bold">공유 관리</h2>
         {admin
