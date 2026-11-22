@@ -116,6 +116,35 @@ export interface Reminder {
   firedAt: number | null
 }
 
+/** 여행별 동기화 상태 */
+export interface SyncMeta2 {
+  tripId: string
+  cursor: number           // (표시용) 서버에서 마지막으로 받은 updated_at 중 가장 늦은 값 (ms)
+  cursors?: Record<string, number> // 테이블별로 마지막에 받은 updated_at (ms)
+  lastSyncAt: number | null
+  lastPushAt: number | null
+  offlineSavedAt: number | null // "오프라인 저장"(전체 내려받기)을 완료한 시각
+  lastError: string | null
+}
+
+/**
+ * 같은 필드를 동시에 고쳐 자동 병합할 수 없는 변경. 사용자가 "내 값/상대 값"을 고를 때까지 보관한다.
+ * kind 'deleted' 는 내가 고치는 사이 다른 사용자가 삭제한 항목(삭제 우선이라 참고용).
+ */
+export interface SyncConflict {
+  id: string               // `${table}:${recordId}:${field}`
+  tripId: string
+  table: string
+  recordId: string
+  field: string            // 로컬 필드명, 삭제 충돌은 '*'
+  kind: 'field' | 'deleted'
+  localValue: unknown
+  remoteValue: unknown
+  serverVersion: number
+  title: string            // 화면 표시용(항목 이름)
+  createdAt: number
+}
+
 /** 오프라인 변경 큐. 서버 전송은 id 기반 upsert라 재전송해도 중복되지 않는다. */
 export interface OutboxEntry {
   seq?: number
@@ -125,4 +154,6 @@ export interface OutboxEntry {
   baseVersion: number
   changedFields: string[]  // 필드 단위 병합용
   createdAt: number
+  attempts?: number        // 서버가 거부한 횟수(무한 재시도 방지)
+  lastError?: string
 }

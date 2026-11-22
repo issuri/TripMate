@@ -14,7 +14,11 @@ describe('createTrip', () => {
     const t = await createTrip(base, db)
     expect(await db.expenseCategories.where({ tripId: t.id }).count()).toBe(DEFAULT_CATEGORIES.length)
     expect(await db.checklistItems.where({ tripId: t.id }).count()).toBeGreaterThan(0)
-    expect(await db.outbox.count()).toBe(1)
+    // 여행 + 기본 지출 항목 + 기본 체크리스트가 모두 동기화 큐에 들어간다(다른 기기에도 기본 항목이 있어야 하므로)
+    const tables = (await db.outbox.toArray()).map((e) => e.table)
+    expect(tables.filter((x) => x === 'trips')).toHaveLength(1)
+    expect(tables.filter((x) => x === 'expense_categories')).toHaveLength(DEFAULT_CATEGORIES.length)
+    expect(tables.filter((x) => x === 'checklist_items').length).toBeGreaterThan(0)
     expect(t.syncState).toBe('pending')
   })
   it('rejects invalid dates', async () => {

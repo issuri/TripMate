@@ -48,11 +48,12 @@ export async function deletePlace(id: string, db: TripMateDB = defaultDb) {
     if (!p || p.deletedAt !== null) return
     await db.places.update(id, { deletedAt: Date.now(), ...pending() })
     await logChange(db, 'places', id, 'delete', p.version, ['deletedAt'])
-    for (const it of await db.itineraryItems.where('tripId').equals(p.tripId).filter((i) => i.placeId === id).toArray()) {
+    // 이미 삭제된 일정/상품은 건드리지 않는다: 삭제된 레코드에 수정 기록이 생기면 동기화 때 서버에 되살아날 수 있다
+    for (const it of await db.itineraryItems.where('tripId').equals(p.tripId).filter((i) => i.deletedAt === null && i.placeId === id).toArray()) {
       await db.itineraryItems.update(it.id, { placeId: null, locationText: it.locationText || p.name, ...pending() })
       await logChange(db, 'itinerary_items', it.id, 'upsert', it.version, ['placeId', 'locationText'])
     }
-    for (const s of await db.shoppingItems.where('tripId').equals(p.tripId).filter((i) => i.storePlaceId === id).toArray()) {
+    for (const s of await db.shoppingItems.where('tripId').equals(p.tripId).filter((i) => i.deletedAt === null && i.storePlaceId === id).toArray()) {
       await db.shoppingItems.update(s.id, { storePlaceId: null, ...pending() })
       await logChange(db, 'shopping_items', s.id, 'upsert', s.version, ['storePlaceId'])
     }

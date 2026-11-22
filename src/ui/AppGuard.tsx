@@ -1,5 +1,5 @@
 import { Component, useEffect, useState, type ReactNode } from 'react'
-import { db } from '../db/local'
+import { db, queueOrphanedLocalRecords } from '../db/local'
 
 function Notice({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
@@ -28,7 +28,7 @@ export function DbGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<'checking' | 'ok' | 'failed'>('checking')
   useEffect(() => {
     let alive = true
-    db.open().then(() => alive && setState('ok'), () => alive && setState('failed'))
+    db.open().then(() => queueOrphanedLocalRecords().catch(() => 0)).then(() => alive && setState('ok'), () => alive && setState('failed'))
     // 용량 부족으로 브라우저가 데이터를 지우지 않도록 영구 저장 요청(지원하는 환경만)
     navigator.storage?.persist?.().catch(() => undefined)
     return () => { alive = false }

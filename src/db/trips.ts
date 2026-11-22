@@ -53,13 +53,16 @@ export async function createTrip(input: NewTripInput, db: TripMateDB = defaultDb
   }
   await db.transaction('rw', [db.trips, db.expenseCategories, db.checklistItems, db.outbox], async () => {
     await db.trips.add(trip)
-    await db.expenseCategories.bulkAdd(DEFAULT_CATEGORIES.map((name, i) => ({
-      id: uuid(), tripId: trip.id, ...meta, name, budgetMinor: 0, sortOrder: i,
-    })))
-    await db.checklistItems.bulkAdd(DEFAULT_CHECKLIST.map((title, i) => ({
-      id: uuid(), tripId: trip.id, ...meta, title, done: false, sortOrder: i,
-    })))
+    const cats = DEFAULT_CATEGORIES.map((name, i) => ({ id: uuid(), tripId: trip.id, ...meta, name, budgetMinor: 0, sortOrder: i }))
+    const checks = DEFAULT_CHECKLIST.map((title, i) => ({ id: uuid(), tripId: trip.id, ...meta, title, done: false, sortOrder: i }))
+    await db.expenseCategories.bulkAdd(cats)
+    await db.checklistItems.bulkAdd(checks)
+    // 기본으로 만든 하위 데이터도 서버에 올라가도록 동기화 큐에 넣는다(빠뜨리면 다른 기기에 기본 항목이 없다)
     await db.outbox.add({ table: 'trips', recordId: trip.id, op: 'upsert', baseVersion: 0, changedFields: ['*'], createdAt: now })
+    await db.outbox.bulkAdd([
+      ...cats.map((c) => ({ table: 'expense_categories', recordId: c.id, op: 'upsert' as const, baseVersion: 0, changedFields: ['*'], createdAt: now })),
+      ...checks.map((c) => ({ table: 'checklist_items', recordId: c.id, op: 'upsert' as const, baseVersion: 0, changedFields: ['*'], createdAt: now })),
+    ])
   })
   await reconcileTripSafe(trip.id, db) // 출발 전날 알림 예약
   return trip

@@ -9,7 +9,7 @@ export const KIND_EMOJI: Record<ItemKind, string> = {
   airport: '🛄', flight: '✈️', transit: '🚇', lodging_in: '🏨', lodging_out: '🧳', sight: '📍', meal: '🍜', shopping: '🛍️', other: '📝',
 }
 
-export const btn = 'rounded-2xl px-5 py-3.5 text-[15px] font-semibold transition active:scale-[.97]'
+export const btn = 'rounded-2xl px-5 py-3.5 text-[15px] font-semibold transition active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
 export const btnPrimary = `${btn} bg-ink text-white`
 export const btnSignal = `${btn} bg-signal text-white`
 export const btnGhost = `${btn} bg-white text-ink ring-1 ring-line`

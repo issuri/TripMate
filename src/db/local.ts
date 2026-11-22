@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, OutboxEntry, Place, Reminder, ShoppingItem, Trip,
+  ChecklistItem, Expense, ExpenseCategory, ItineraryItem, OutboxEntry, Place, Reminder, ShoppingItem, SyncConflict, SyncMeta2, Trip,
 } from './types'
 
 export class TripMateDB extends Dexie {
@@ -13,6 +13,8 @@ export class TripMateDB extends Dexie {
   expenses!: Table<Expense, string>
   outbox!: Table<OutboxEntry, number>
   reminders!: Table<Reminder, string>
+  syncMeta!: Table<SyncMeta2, string>
+  conflicts!: Table<SyncConflict, string>
 
   constructor(name = 'tripmate') {
     super(name)
@@ -29,7 +31,32 @@ export class TripMateDB extends Dexie {
     })
     // v2: 기기 로컬 알림 예약 테이블 추가 (기존 데이터는 그대로 유지)
     this.version(2).stores({ reminders: 'id, tripId, itemId, fireAt, state' })
+    // v3: 동기화 상태(여행별)와 충돌 보관 테이블
+    this.version(3).stores({ syncMeta: 'tripId', conflicts: 'id, tripId, recordId' })
   }
 }
 
 export const db = new TripMateDB()
+
+/**
+ * 서버에 한 번도 올라간 적 없는데(version 0) 동기화 큐에도 없는 레코드를 큐에 넣는다. 멱등.
+ * 동기화 도입 전에 만든 데이터(예: 여행 생성 때 자동으로 만든 기본 지출 항목·체크리스트)가 서버에 영원히 올라가지 않는 것을 막는다.
+ */
+export async function queueOrphanedLocalRecords(d: TripMateDB = db): Promise<number> {
+  const targets: [keyof TripMateDB & string, string][] = [['trips', 'trips'], ['places', 'places'], ['itineraryItems', 'itinerary_items'], ['checklistItems', 'checklist_items'], ['expenseCategories', 'expense_categories'], ['shoppingItems', 'shopping_items']]
+  let added = 0
+  await d.transaction('rw', [d.trips, d.places, d.itineraryItems, d.checklistItems, d.expenseCategories, d.shoppingItems, d.outbox], async () => {
+    const queued = new Set((await d.outbox.toArray()).map((e) => e.recordId))
+    for (const [store, serverTable] of targets) {
+      const rows = (await (d[store as 'trips'] as unknown as Table<{ id: string; version?: number; deletedAt: number | null }, string>).toArray())
+      for (const r of rows) {
+        // 서버가 모르는 채로 삭제된 레코드는 보낼 것이 없다(큐에 넣으면 시작할 때마다 넣고 지우는 일이 반복된다)
+        if ((r.version ?? 0) === 0 && !r.deletedAt && !queued.has(r.id)) {
+          await d.outbox.add({ table: serverTable, recordId: r.id, op: 'upsert', baseVersion: 0, changedFields: ['*'], createdAt: Date.now() })
+          added++
+        }
+      }
+    }
+  })
+  return added
+}

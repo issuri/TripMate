@@ -4,7 +4,7 @@ import Dexie from 'dexie'
 import { describe, expect, it } from 'vitest'
 import { summarizeShopping } from '../lib/shopping'
 import { addItem, listItems, moveItem, setCompleted, updateItem } from './itinerary'
-import { TripMateDB } from './local'
+import { queueOrphanedLocalRecords, TripMateDB } from './local'
 import { addPlace } from './places'
 import { claimDue, reconcileTrip } from './reminders'
 import { listShopping, setPurchased, updateShopping } from './shopping'
@@ -39,6 +39,30 @@ describe('upgrading an existing local database', () => {
     expect(await db.trips.count()).toBe(1)
     expect(await db.reminders.count()).toBe(0)
     expect((await listTrips(db))[0].name).toBe('옛 여행')
+  })
+
+  it('upgrade queues pre-sync records that were never queued, without duplicating queued ones', async () => {
+    const name = 'legacy3-' + Math.random()
+    await seedV1(name)
+    const old = new Dexie(name)
+    old.version(1).stores({
+      trips: 'id, startDate, syncState', itineraryItems: 'id, [tripId+dayNumber], tripId, syncState', places: 'id, tripId, syncState',
+      checklistItems: 'id, tripId, syncState', shoppingItems: 'id, tripId, syncState', expenseCategories: 'id, tripId, syncState',
+      expenses: 'id, tripId, paidAt, syncState', outbox: '++seq, table, recordId',
+    })
+    await old.open()
+    // 여행 생성 시 기본 체크리스트는 큐에 안 들어갔고, 일정 i1 은 큐에 이미 있는 상태
+    await old.table('checklistItems').add({ id: 'c1', tripId: 't1', ...meta, title: '여권', done: false, sortOrder: 0 })
+    await old.table('outbox').add({ table: 'itinerary_items', recordId: 'i1', op: 'upsert', baseVersion: 0, changedFields: ['*'], createdAt: 1 })
+    old.close()
+    const db = new TripMateDB(name); await db.open()
+    const added = await queueOrphanedLocalRecords(db)
+    expect(added).toBeGreaterThan(0)
+    expect(await queueOrphanedLocalRecords(db)).toBe(0)                    // 멱등: 두 번째는 아무것도 추가하지 않음
+    const q = await db.outbox.toArray()
+    expect(q.filter((e) => e.recordId === 'c1')).toHaveLength(1)           // 큐에 없던 항목이 추가됨
+    expect(q.filter((e) => e.recordId === 'i1')).toHaveLength(1)           // 이미 있던 항목은 중복 추가되지 않음
+    expect(q.some((e) => e.recordId === 't1')).toBe(true)
   })
 
   it('legacy records without newer fields still work everywhere', async () => {
