@@ -149,8 +149,8 @@ function TripFormInner() {
           <Field label="지역"><input className={input} value={f.city} onChange={set('city')} placeholder="제주, 부산, 강릉 등" /></Field>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="시작일 *"><input type="date" className={input} value={f.startDate} onChange={(e) => setStart(e.target.value)} /></Field>
-          <Field label="종료일 *"><input type="date" className={input} value={f.endDate} min={f.startDate || undefined} onChange={(e) => setEnd(e.target.value)} /></Field>
+          <Field label="시작일 *"><input type="date" className={input} value={f.startDate} data-empty={!f.startDate} data-ph="날짜 선택" onChange={(e) => setStart(e.target.value)} /></Field>
+          <Field label="종료일 *"><input type="date" className={input} value={f.endDate} min={f.startDate || undefined} data-empty={!f.endDate} data-ph="날짜 선택" onChange={(e) => setEnd(e.target.value)} /></Field>
         </div>
         {dateNote && <p className="px-1 text-xs text-danger" role="alert">{dateNote}</p>}
         {!abroad && <p className="px-1 text-xs text-ink-3">국내 여행은 한국 시간과 원화로 설정돼요. 모든 알림은 한국 시간 기준이에요.</p>}

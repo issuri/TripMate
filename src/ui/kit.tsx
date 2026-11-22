@@ -13,7 +13,8 @@ export const btn = 'rounded-2xl px-5 py-3.5 text-[15px] font-semibold transition
 export const btnPrimary = `${btn} bg-ink text-white`
 export const btnSignal = `${btn} bg-signal text-white`
 export const btnGhost = `${btn} bg-white text-ink ring-1 ring-line`
-export const input = 'w-full min-w-0 rounded-2xl border-0 bg-white px-4 py-3.5 text-base ring-1 ring-line placeholder:text-ink-3 focus:ring-2 focus:ring-signal outline-none'
+// 테두리는 그림자(ring)가 아니라 실제 border 로 그린다: 아이폰 사파리는 선택 목록·날짜 칸을 자체 모양으로 그려서 그림자 테두리가 사라진다.
+export const input = 'w-full min-w-0 min-h-[3.25rem] rounded-2xl border border-line-strong bg-white px-4 py-[13px] text-base placeholder:text-ink-3 focus:border-signal focus:ring-2 focus:ring-signal/25 outline-none'
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block min-w-0"><span className="mb-1.5 block px-1 text-[13px] font-medium text-ink-2">{label}</span>{children}</label>

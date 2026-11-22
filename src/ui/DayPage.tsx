@@ -149,8 +149,8 @@ function ItemSheet({ trip, total, day, item, onClose, onAddExpense }: { trip: Tr
             {Array.from({ length: total }, (_, i) => i + 1).map((d) => <option key={d} value={d}>DAY {d}</option>)}</select></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="시작"><input type="time" className={input} value={f.startTime} onChange={s('startTime')} /></Field>
-          <Field label="종료"><input type="time" className={input} value={f.endTime} onChange={s('endTime')} /></Field>
+          <Field label="시작"><input type="time" className={input} value={f.startTime} data-empty={!f.startTime} data-ph="시간 선택" onChange={s('startTime')} /></Field>
+          <Field label="종료"><input type="time" className={input} value={f.endTime} data-empty={!f.endTime} data-ph="시간 선택" onChange={s('endTime')} /></Field>
         </div>
         <Field label="저장한 장소 (지도 탭에서 저장)">
           <select className={input} value={f.placeId} onChange={s('placeId')}><option value="">연결 안 함</option>{saved.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>

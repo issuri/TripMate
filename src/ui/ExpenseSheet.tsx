@@ -143,7 +143,7 @@ export default function ExpenseSheet({ trip, expense, preset, onClose }: { trip:
         </Field>
 
         <div className="grid grid-cols-2 gap-2">
-          <Field label="결제 날짜·시간"><input type="datetime-local" className={input} value={paidAt} onChange={(e) => setPaidAt(e.target.value)} /></Field>
+          <Field label="결제 날짜·시간"><input type="datetime-local" className={input} value={paidAt} data-empty={!paidAt} data-ph="날짜·시간 선택" onChange={(e) => setPaidAt(e.target.value)} /></Field>
           <Field label="결제 수단">
             <input className={input} value={method} onChange={(e) => setMethod(e.target.value)} list="pay-methods" placeholder="현금, 카드…" />
             <datalist id="pay-methods">{[...(defaults?.methods ?? []), '현금', '카드', '교통카드', '간편결제'].filter((v, i, a) => a.indexOf(v) === i).map((m) => <option key={m} value={m} />)}</datalist>
